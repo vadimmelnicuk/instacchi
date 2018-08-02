@@ -1,0 +1,33 @@
+
+/* Main CSS */
+
+html, body {width: 100%; height: 100%;}
+
+body {background-color: gainsboro; font-size: 1rem; font-family: 'Source Sans Pro', sans-serif;}
+
+header, main, footer {width: 100%; max-width: 1200px; margin: 0 auto;}
+
+a {color: black; text-decoration: none;}
+a:hover {text-decoration: underline;}
+
+.btn {display: inline-block; padding: 5px 10px; border: 1px solid black; background-color: white; transition: .2s ease; font-family: 'Source Sans Pro', sans-serif;}
+.btn:hover {background-color: black; color: white; cursor: pointer;}
+.btn.small {font-size: 1rem;}
+
+input[type=text], input[type=password], input[type=number], input[type=time] {display: inline-block; box-sizing: border-box; padding: 5px 10px; border: 1px solid black; background-color: white; font-family: 'Source Sans Pro', sans-serif;}
+input:focus {outline: none;}
+
+.left {float: left;}
+.right {float: right;}
+
+.mt10 {margin-top: 10px;}
+.mr25 {margin-right: 25px;}
+.mr10 {margin-right: 10px;}
+
+@media only screen and (max-width: 1080px) {
+    header, main, footer {width: 100%;}
+}
+
+@media only screen and (max-width: 1280px) {
+    header, main, footer {width: 100%; max-width: 900px; margin: 0 auto;}
+}
