@@ -11,8 +11,6 @@ Accounts.onCreateUser((options, user) => {
   }
 
   user.settings = {
-    instaUsername: '',
-    instaPassword: '',
     likesEnabled: true,
     followsEnabled: true,
     unfollowsEnabled: true,
@@ -36,11 +34,16 @@ Accounts.onCreateUser((options, user) => {
     imagesShow: false
   }
 
-  user.stats = {
+  user.instaStats = {
     totalLikes: 0,
     totalFollows: 0,
     totalUnfollows: 0,
     totalComments: 0
+  }
+
+  user.instaCredentials = {
+    username: '',
+    password: ''
   }
 
   return user

@@ -42,7 +42,7 @@ Meteor.methods({
     follow.createdAt = new Date()
     follow.following = true
 
-    Meteor.users.update(follow.author, {$inc: {'stats.totalFollows': 1}})
+    Meteor.users.update(follow.author, {$inc: {'instaStats.totalFollows': 1}})
 
     return Follows.insert(follow)
   },
@@ -51,7 +51,7 @@ Meteor.methods({
 
     let follow = Follows.findOne(id)
 
-    Meteor.users.update(follow.author, {$inc: {'stats.totalUnfollows': 1}})
+    Meteor.users.update(follow.author, {$inc: {'instaStats.totalUnfollows': 1}})
 
     return Follows.update(id, {$set: {createdAt: new Date(), following: false}})
   },

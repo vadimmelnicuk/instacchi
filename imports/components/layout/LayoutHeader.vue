@@ -48,6 +48,7 @@
     methods: {
       logout () {
         Meteor.logout()
+        this.$router.go()
       }
     }
   }

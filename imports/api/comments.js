@@ -32,7 +32,7 @@ Meteor.methods({
 
     comment.createdAt = new Date()
 
-    Meteor.users.update(comment.author, {$inc: {'stats.totalComments': 1}})
+    Meteor.users.update(comment.author, {$inc: {'instaStats.totalComments': 1}})
 
     return Comments.insert(comment)
   }

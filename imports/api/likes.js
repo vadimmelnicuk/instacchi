@@ -30,7 +30,7 @@ Meteor.methods({
 
     like.createdAt = new Date()
 
-    Meteor.users.update(like.author, {$inc: {'stats.totalLikes': 1}})
+    Meteor.users.update(like.author, {$inc: {'instaStats.totalLikes': 1}})
 
     return Likes.insert(like)
   },

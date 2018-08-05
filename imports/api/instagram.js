@@ -2,6 +2,7 @@ import { Meteor } from 'meteor/meteor'
 import { Random } from 'meteor/random'
 import moment from 'moment'
 import puppeteer from 'puppeteer'
+import aes256 from 'aes256'
 
 import {Browsers, Likes, Follows, Comments, instaStats} from "/imports/api/collections"
 
@@ -37,7 +38,13 @@ Meteor.methods({
     const page = pages[0]
     const url = "https://www.instagram.com/accounts/login/"
     const userId = Meteor.userId()
-    await page.goto(url)
+    try{
+      await page.goto(url)
+    }catch (e) {
+      Meteor.call('browserInstaRun', false)
+      console.log(e)
+      return false
+    }
     await sleepShort()
     await Meteor.call('instaLogin', userId, endpoint)
     await Meteor.call('closeBrowsers', userId)
@@ -95,7 +102,7 @@ Meteor.methods({
     await Meteor.call('browserProcessing', userId, true)
 
     // Check if within like/follow/unfollow limits
-    const user = await Meteor.users.findOne(userId, {fields: {settings: 1}})
+    const user = await Meteor.users.findOne(userId, {fields: {settings: 1, instaCredentials: 1}})
     const activitiesFrom = Date.parse('01/01/2001 '+user.settings.activitiesFrom+':00')
     const activitiesUntil = Date.parse('01/01/2001 '+user.settings.activitiesUntil+':00')
     let today = new Date()
@@ -138,7 +145,7 @@ Meteor.methods({
     const statsMy = await instaStats.findOne({author: userId, createdAt: {$gte: thisHour}})
     if(!statsMy) {
       Meteor.call('logSaveUser', {message: '--- Running insta get my stats', author: userId})
-      const statsHandle = await Meteor.call('instaGetUserStats', userId, endpoint, user.settings.username)
+      const statsHandle = await Meteor.call('instaGetUserStats', userId, endpoint, user.instaCredentials.username)
       if(statsHandle) {
         Meteor.call('statsSave', userId, statsHandle)
       }
@@ -286,9 +293,12 @@ Meteor.methods({
     if(inputUsername.length > 0) {
       Meteor.call('logSaveUser', {message: '--- Running log in', author: userId})
 
+      const user = Meteor.users.findOne(userId, {fields: {settings: 1, instaCredentials: 1}})
+      const cipher = aes256.createCipher(Meteor.settings.private.instagram.secret)
+
       // Type in log in details
-      const username = Meteor.settings.private.instaUser.username
-      const password = Meteor.settings.private.instaUser.password
+      const username = user.instaCredentials.username
+      const password = cipher.decrypt(user.instaCredentials.password)
 
       await inputUsername[0].type(username, {delay: 25})
       await sleepShort()

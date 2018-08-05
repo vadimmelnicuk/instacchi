@@ -2,13 +2,25 @@
   <div class="profile" v-if="$subReady.profileId">
     <div class="settings">
       <h3>Settings</h3>
-      <form v-on:submit.prevent="saveSettings">
+      <form v-on:submit.prevent="saveInstaUsername">
         <label for="username">Instagram username</label>
-        <input type="text" id="username" name="username" v-bind:value="profile.settings.username"><br><br>
-        <label for="browserShow">Show browser</label>
-        <input type="checkbox" id="browserShow" name="browserShow" v-model="profile.settings.browserShow">
-        <label for="imagesShow">Show images</label>
-        <input type="checkbox" id="imagesShow" name="imagesShow" v-model="profile.settings.imagesShow"><br><br>
+        <input type="text" id="username" name="username" v-bind:value="profile.instaCredentials.username">
+        <input type="submit" value="Save" class="btn">
+      </form>
+
+      <form v-on:submit.prevent="saveInstaPassword">
+        <label for="password">Instagram password</label>
+        <input type="password" id="password" name="password">
+        <input type="submit" value="Save" class="btn">
+      </form><br>
+      
+      <form v-on:submit.prevent="saveSettings">
+        <div class="devPannel" v-if="isDevelopment">
+          <label for="browserShow">Show browser</label>
+          <input type="checkbox" id="browserShow" name="browserShow" v-model="profile.settings.browserShow">
+          <label for="imagesShow">Show images</label>
+          <input type="checkbox" id="imagesShow" name="imagesShow" v-model="profile.settings.imagesShow"><br><br>
+        </div>
         <label for="likesEnabled">Liking</label>
         <input type="checkbox" id="likesEnabled" name="likesEnabled" v-model="profile.settings.likesEnabled">
         <label for="followsEnabled">Following</label>
@@ -59,6 +71,11 @@
 
   export default {
     name: 'profile',
+    data () {
+      return {
+        isDevelopment: Meteor.isDevelopment
+      }
+    },
     mounted () {
       this.$subscribe('profileId', [this.$route.params.id])
     },
@@ -71,7 +88,6 @@
       saveSettings(event) {
         let self = this
         let settings = {
-          username: event.target.username.value,
           likesEnabled: event.target.likesEnabled.checked,
           followsEnabled: event.target.followsEnabled.checked,
           unfollowsEnabled: event.target.unfollowsEnabled.checked,
@@ -101,9 +117,34 @@
             self.toast("Settings were saved")
           }
         })
+      },
+      saveInstaUsername(event) {
+        let self = this
+
+        Meteor.call('profileSaveInstaUsername', event.target.username.value, function (e) {
+          if(e) {
+            self.toast(e.reason)
+          }else{
+            self.toast("Instagram username was saved")
+          }
+        })
+      },
+      saveInstaPassword(event) {
+        let self = this
+
+        Meteor.call('profileSaveInstaPassword', event.target.password.value, function (e) {
+          if(e) {
+            self.toast(e.reason)
+          }else{
+            self.toast("Instagram password was saved")
+          }
+        })
       }
     },
     beforeRouteEnter(to, from, next) {
+      Meteor.userId() ? next() : next({name: 'login'})
+    },
+    beforeRouteUpdate(to, from, next) {
       Meteor.userId() ? next() : next({name: 'login'})
     }
   }

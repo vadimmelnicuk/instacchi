@@ -26,7 +26,7 @@
         <td class="likes">
           <div class="stat">
             Total likes
-            <div v-if="$subReady.profileId" class="number">{{profile.stats.totalLikes}}</div><div v-else class="number">0</div>
+            <div v-if="$subReady.profileId" class="number">{{profile.instaStats.totalLikes}}</div><div v-else class="number">0</div>
           </div>
           <div class="stat">
             Today's likes
@@ -42,7 +42,7 @@
         <td class="follows">
           <div class="stat">
             Total follows
-            <div v-if="$subReady.profileId" class="number">{{profile.stats.totalFollows}}</div><div v-else class="number">0</div>
+            <div v-if="$subReady.profileId" class="number">{{profile.instaStats.totalFollows}}</div><div v-else class="number">0</div>
           </div>
           <div class="stat">
             Today's follows
@@ -58,7 +58,7 @@
         <td class="unfollows">
           <div class="stat">
             Total unfollows
-            <div v-if="$subReady.profileId" class="number">{{profile.stats.totalUnfollows}}</div><div v-else class="number">0</div>
+            <div v-if="$subReady.profileId" class="number">{{profile.instaStats.totalUnfollows}}</div><div v-else class="number">0</div>
           </div>
           <div class="stat">
             Today's unfollows / limit
@@ -70,7 +70,7 @@
         <td class="comments">
           <div class="stat">
             Total comments
-            <div v-if="$subReady.profileId" class="number">{{profile.stats.totalComments}}</div><div v-else class="number">0</div>
+            <div v-if="$subReady.profileId" class="number">{{profile.instaStats.totalComments}}</div><div v-else class="number">0</div>
           </div>
           <div class="stat">
             Today's comments
@@ -110,9 +110,9 @@
           <div class="controls">
             <button v-on:click="launchBrowser()" class="btn small">Launch browser</button>
             <button v-on:click="closeMyBrowser()" class="btn small">Close my browser</button>
-            <button v-on:click="closeBrowsers()" class="btn small">Close all browsers</button><br/>
-            <button v-on:click="clearLogs()" class="btn small">Clear logs</button>
-            <button v-on:click="clearLikes()" class="btn small">Clear likes</button>
+            <button v-on:click="closeBrowsers()" class="btn small" v-if="isDevelopment">Close all browsers</button><br/>
+            <button v-on:click="clearLogs()" class="btn small" v-if="isDevelopment">Clear logs</button>
+            <button v-on:click="clearLikes()" class="btn small" v-if="isDevelopment">Clear likes</button>
           </div>
         </td>
       </tr>
@@ -175,8 +175,8 @@
       No logs
     </div>
 
-    <h3>Browsers</h3>
-    <div class="browsers" v-if="$subReady.browsersAll && browsers.length > 0">
+    <h3 v-if="isDevelopment">Browsers</h3>
+    <div class="browsers" v-if="$subReady.browsersAll && browsers.length > 0 && isDevelopment">
       <div class="browser" v-for="browserItem in browsers" v-bind:key="browserItem._id">
         <b>{{browserItem.createdAt | readableDate}}</b>
         {{browserItem.author}}
@@ -205,6 +205,11 @@
 
   export default {
     name: 'home',
+    data () {
+      return {
+        isDevelopment: Meteor.isDevelopment
+      }
+    },
     mounted () {
       this.$subscribe('profileId', [Meteor.userId()])
       this.$subscribe('statsLatest', [])
@@ -348,6 +353,9 @@
       }
     },
     beforeRouteEnter(to, from, next) {
+      Meteor.userId() ? next() : next({name: 'login'})
+    },
+    beforeRouteUpdate(to, from, next) {
       Meteor.userId() ? next() : next({name: 'login'})
     }
   }

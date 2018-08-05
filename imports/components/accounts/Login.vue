@@ -1,7 +1,7 @@
 <template>
   <div v-if="!userId" class="login">
     <form v-on:submit.prevent="login">
-      <input type="text" name="email" placeholder="Email">
+      <input type="text" name="email" placeholder="Username or email">
       <input type="password" name="password" placeholder="Password">
       <input type="submit" value="Login" class="btn">
     </form>
