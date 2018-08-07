@@ -1,6 +1,7 @@
 <template>
   <div class="not-found">
-    Page not found!
+    <img src="img/doge.png">
+    Page not found
   </div>
 </template>
 
@@ -11,5 +12,6 @@
 </script>
 
 <style scoped>
-
+  .not-found {font-size: 2rem; text-align: center;}
+  .not-found img {width: 250px;}
 </style>

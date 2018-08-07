@@ -67,8 +67,6 @@
 <script>
   import { Meteor } from 'meteor/meteor'
 
-  // TODO - save instagram password securely
-
   export default {
     name: 'profile',
     data () {
@@ -106,10 +104,15 @@
           commentRate: parseInt(event.target.commentRate.value),
           unfollowsPerDay: parseInt(event.target.unfollowsPerDay.value),
           tags: event.target.tags.value,
-          commentSeed: event.target.commentSeed.value,
-          browserShow: event.target.browserShow.checked,
-          imagesShow: event.target.imagesShow.checked
+          commentSeed: event.target.commentSeed.value
         }
+
+        // Production fix
+        if(Meteor.isDevelopment) {
+          settings.browserShow = event.target.browserShow.checked
+          settings.imagesShow = event.target.imagesShow.checked
+        }
+
         Meteor.call('profileSaveSettings', settings, function (e) {
           if(e) {
             self.toast(e.reason)

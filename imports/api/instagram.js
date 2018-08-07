@@ -174,19 +174,19 @@ Meteor.methods({
       await Meteor.call('browserProcessing', userId, false)
       return false
     }
-    await sleepShort()
 
     // Get user's stats
     const stats = await Meteor.call('instaGetUserStats', userId, endpoint, userName)
-    await sleepShort()
 
     // Check if in limits
-    if(!stats && stats.followers >= user.settings.maxFollowers || stats.following >= user.settings.maxFollowing || stats.posts < user.settings.minPosts) {
-      Meteor.call('logSaveUser', {message: 'User filtered out ' + JSON.stringify(stats), author: userId})
+    if(!stats || stats.followers >= user.settings.maxFollowers || stats.following >= user.settings.maxFollowing || stats.posts < user.settings.minPosts) {
+      Meteor.call('logSaveUser', {message: 'User is FILTERED. posts: ' + stats.posts + ', followers: ' + stats.followers + ', following: ' + stats.following + ', url: ' + stats.url, author: userId})
       await Meteor.call('closeBrowsers', userId)
       await Meteor.call('browserProcessing', userId, false)
       return false
     }
+
+    Meteor.call('logSaveUser', {message: 'User is OK. posts: ' + stats.posts + ', followers: ' + stats.followers + ', following: ' + stats.following + ', url: ' + stats.url, author: userId})
 
     // Like routine
     if(user.settings.likesEnabled && likes < user.settings.likesPerHour) {
@@ -448,9 +448,9 @@ Meteor.methods({
     const followers = await statsHandle[1].getProperty('textContent')
     const following = await statsHandle[2].getProperty('textContent')
     stats.url = await page.url()
-    stats.posts = await parseStat(posts._remoteObject.value.replace(',', ''))
-    stats.followers = await parseStat(followers._remoteObject.value.replace(',', ''))
-    stats.following = await parseStat(following._remoteObject.value.replace(',', ''))
+    stats.posts = await parseStat(posts._remoteObject.value)
+    stats.followers = await parseStat(followers._remoteObject.value)
+    stats.following = await parseStat(following._remoteObject.value)
     stats.username = userName
 
     try{
@@ -758,12 +758,13 @@ async function getRandomIntInclusive(min, max) {
 }
 
 async function parseStat(number) {
+  number = number.replace(",", "")
   let multiplier = number.substr(-1).toLowerCase()
 
-  if (multiplier == "k") {
+  if (multiplier === "k") {
     return parseFloat(number) * 1000
   }
-  else if (multiplier == "m") {
+  else if (multiplier === "m") {
     return parseFloat(number) * 1000000
   }
   else {

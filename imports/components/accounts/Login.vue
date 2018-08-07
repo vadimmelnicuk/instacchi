@@ -28,7 +28,7 @@
           if(e) {
             self.toast(e.reason)
           }else{
-            this.$router.push({name: 'home'})
+            this.$router.push({name: 'dashboard'})
             self.toast('Logged in successfully')
           }
         })

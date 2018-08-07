@@ -26,7 +26,8 @@
       </div>
 
       <div class="nav">
-        <!--<router-link :to="{name: 'about'}" class="mr25">About</router-link>-->
+        <router-link :to="{name: 'dashboard'}" class="mr25" v-if="userId">Dashboard</router-link>
+        <router-link :to="{name: 'about'}" class="mr25">About</router-link>
       </div>
     </div>
   </header>
@@ -48,7 +49,7 @@
     methods: {
       logout () {
         Meteor.logout()
-        this.$router.go()
+        this.$router.push({name: "home"})
       }
     }
   }
@@ -63,5 +64,5 @@
   .logo a:hover {border: 0; text-decoration: none; text-shadow: 0px 2px 0px #fff, 0px 5px 0px rgba(0,0,0,0.25);}
   .auth {position: absolute; top: 42px; right: 40px;}
   .auth .profile {margin-right: 10px; font-size: 1.25rem;}
-  .nav {width: 100%; margin-top: 25px; padding-top: 25px; font-size: 1.25rem; font-weight: bold; border-top: 1px solid gainsboro;}
+  .nav {width: 100%; margin-top: 25px; padding-top: 25px; font-size: 1.5rem; border-top: 1px solid gainsboro;}
 </style>
