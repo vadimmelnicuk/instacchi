@@ -26,7 +26,7 @@
         <td class="likes">
           <div class="stat">
             Total likes
-            <div v-if="$subReady.profileId" class="number">{{profile.instaStats.totalLikes}}</div><div v-else class="number">0</div>
+            <div v-if="$subReady.profileInstaStatsMy" class="number">{{profile.instaStats.totalLikes}}</div><div v-else class="number">0</div>
           </div>
           <div class="stat">
             Today's likes
@@ -42,7 +42,7 @@
         <td class="follows">
           <div class="stat">
             Total follows
-            <div v-if="$subReady.profileId" class="number">{{profile.instaStats.totalFollows}}</div><div v-else class="number">0</div>
+            <div v-if="$subReady.profileInstaStatsMy" class="number">{{profile.instaStats.totalFollows}}</div><div v-else class="number">0</div>
           </div>
           <div class="stat">
             Today's follows
@@ -58,7 +58,7 @@
         <td class="unfollows">
           <div class="stat">
             Total unfollows
-            <div v-if="$subReady.profileId" class="number">{{profile.instaStats.totalUnfollows}}</div><div v-else class="number">0</div>
+            <div v-if="$subReady.profileInstaStatsMy" class="number">{{profile.instaStats.totalUnfollows}}</div><div v-else class="number">0</div>
           </div>
           <div class="stat">
             Today's unfollows / limit
@@ -70,7 +70,7 @@
         <td class="comments">
           <div class="stat">
             Total comments
-            <div v-if="$subReady.profileId" class="number">{{profile.instaStats.totalComments}}</div><div v-else class="number">0</div>
+            <div v-if="$subReady.profileInstaStatsMy" class="number">{{profile.instaStats.totalComments}}</div><div v-else class="number">0</div>
           </div>
           <div class="stat">
             Today's comments
@@ -213,6 +213,7 @@
     },
     mounted () {
       this.$subscribe('profileId', [Meteor.userId()])
+      this.$subscribe('profileInstaStatsMy', [])
       this.$subscribe('statsLatest', [])
       this.$subscribe('browsersAll', [])
       this.$subscribe('browserMy', [])
@@ -354,7 +355,6 @@
       }
     },
     beforeRouteEnter(to, from, next) {
-      console.log(Meteor.userId())
       Meteor.userId() ? next() : next({name: 'login'})
     },
     beforeRouteUpdate(to, from, next) {

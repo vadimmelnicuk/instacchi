@@ -6,7 +6,11 @@ import aes256 from 'aes256'
 Meteor.publish('profileId', (id) => {
   check(id, String);
 
-  return Meteor.users.find(id, {fields: {username: 1, profile: 1, createdAt: 1, settings: 1, instaStats: 1, 'instaCredentials.username': 1}})
+  return Meteor.users.find(id, {fields: {username: 1, profile: 1, createdAt: 1, settings: 1, 'instaCredentials.username': 1}})
+})
+
+Meteor.publish('profileInstaStatsMy', () => {
+  return Meteor.users.find(Meteor.userId(), {fields: {instaStats: 1}})
 })
 
 Meteor.methods({

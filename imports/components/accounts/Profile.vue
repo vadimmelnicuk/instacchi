@@ -79,7 +79,7 @@
     },
     meteor: {
       profile() {
-        return Meteor.users.findOne(this.$route.params.id, {reactive: false})
+        return Meteor.users.findOne(this.$route.params.id)
       }
     },
     methods: {

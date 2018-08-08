@@ -1,9 +1,6 @@
 <template>
   <footer>
     <div class="wrapper">
-      <div class="meta">
-        Powered by Meteor, Vue, and Puppeteer.
-      </div>
       ©2018 <router-link :to="{name: 'home'}">instacchi</router-link>
     </div>
   </footer>
