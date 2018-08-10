@@ -463,11 +463,12 @@ Meteor.methods({
     return stats
   },
   async instaLike(userId, endpoint, userName, userUrl, tag) {
-    //Only interact once
-    const likes = await Likes.find({userName: userName}).fetch()
-    if(likes.length > 0) {
-      return false
-    }
+    // Only interact once
+    // Disable this - likes can be attributed to the same people now
+    // const likes = await Likes.find({author: userId, userName: userName}).fetch()
+    // if(likes.length > 0) {
+    //   return false
+    // }
 
     Meteor.call('logSaveUser', {message: '--- Running insta like', author: userId})
 
@@ -519,18 +520,18 @@ Meteor.methods({
   },
   async instaFollow(userId, endpoint, userName, userUrl, tag) {
     //Only follow once
-    const follows = await Follows.find({userName: userName}).fetch()
+    const follows = await Follows.find({author: userId, userName: userName}).fetch()
     if(follows.length > 0) {
       return false
     }
 
     // Check whether we are over follow rate threshold
     const user = await Meteor.users.findOne(userId, {fields: {settings: 1}})
-    const follow = await Follows.findOne({following: true}, {sort: {createdAt: -1}})
+    const follow = await Follows.findOne({author: userId, following: true}, {sort: {createdAt: -1}})
     if(follow) {
       const currentTime = new Date()
       const elapsedTime = currentTime - follow.createdAt
-      // Less than a 30s since the last follow
+      // Less than a followRate since the last follow
       if(elapsedTime < user.settings.followRate * 1000) {
         return false
       }
@@ -628,8 +629,8 @@ Meteor.methods({
         return false
       }
     }else{
-      // Fix - account for 'Follow Back' case when checking whether a user was unfollowed manually
-      query = "//button[text()='Follow' or text()='Follow Back']"
+      // Fix - account for 'Follow Back' and 'Unblock' case when checking whether a user was unfollowed manually
+      query = "//button[text()='Follow' or text()='Follow Back' or text()='Unblock']"
       const followButton = await page.$x(query)
       if(followButton.length > 0) {
         Meteor.call('follow.unfollow', follow._id)
@@ -661,7 +662,7 @@ Meteor.methods({
 
     await sleepMedium()
 
-    query = "//button[text()='Follow' or text()='Follow Back']"
+    query = "//button[text()='Follow' or text()='Follow Back' or text()='Unblock']"
     const followButton = await page.$x(query)
     if(followButton.length > 0) {
       Meteor.call('follow.unfollow', follow._id)
@@ -673,7 +674,7 @@ Meteor.methods({
   },
   async instaComment(userId, endpoint, userName, userUrl, tag) {
     //Only comment once
-    const comments = await Comments.find({userName: userName}).fetch()
+    const comments = await Comments.find({author: userId, userName: userName}).fetch()
     if(comments.length > 0) {
       return false
     }

@@ -35,14 +35,18 @@
           <div class="stat">
             This hour likes / limit
             <div class="number">
-              {{likesThisHour}} <span v-if="$subReady.profileId" class="limit"> / {{profile.settings.likesPerHour}}</span>
+              {{likesThisHour}} <span v-if="$subReady.profileMy" class="limit"> / {{profile.settings.likesPerHour}}</span>
             </div>
           </div>
         </td>
         <td class="follows">
           <div class="stat">
-            Total follows
-            <div v-if="$subReady.profileInstaStatsMy" class="number">{{profile.instaStats.totalFollows}}</div><div v-else class="number">0</div>
+            Total follows / active
+            <div class="number">
+              <span v-if="$subReady.profileInstaStatsMy">{{profile.instaStats.totalFollows}}</span>
+              <span v-if="$subReady.followsMy" class="limit"> / {{followsActive}}</span>
+              <span v-else class="limit"> / 0</span>
+            </div>
           </div>
           <div class="stat">
             Today's follows
@@ -51,7 +55,7 @@
           <div class="stat">
             This hour follows / limit
             <div class="number">
-              {{followsThisHour}} <span v-if="$subReady.profileId" class="limit"> / {{profile.settings.followsPerHour}}</span>
+              {{followsThisHour}} <span v-if="$subReady.profileMy" class="limit"> / {{profile.settings.followsPerHour}}</span>
             </div>
           </div>
         </td>
@@ -63,7 +67,7 @@
           <div class="stat">
             Today's unfollows / limit
             <div class="number">
-              {{unfollowsToday}} <span v-if="$subReady.profileId" class="limit"> / {{profile.settings.unfollowsPerDay}}</span>
+              {{unfollowsToday}} <span v-if="$subReady.profileMy" class="limit"> / {{profile.settings.unfollowsPerDay}}</span>
             </div>
           </div>
         </td>
@@ -79,7 +83,7 @@
           <div class="stat">
             This hour comments / limit
             <div class="number">
-              {{commentsThisHour}} <span v-if="$subReady.profileId" class="limit"> / {{profile.settings.commentsPerHour}}</span>
+              {{commentsThisHour}} <span v-if="$subReady.profileMy" class="limit"> / {{profile.settings.commentsPerHour}}</span>
             </div>
           </div>
         </td>
@@ -212,12 +216,13 @@
       }
     },
     mounted () {
-      this.$subscribe('profileId', [Meteor.userId()])
+      this.$subscribe('profileMy', [])
       this.$subscribe('profileInstaStatsMy', [])
       this.$subscribe('statsLatest', [])
       this.$subscribe('browsersAll', [])
       this.$subscribe('browserMy', [])
       this.$subscribe('logsMy', [])
+      this.$subscribe('followsMy', [])
       this.$subscribe('likesToday', [])
       this.$subscribe('followsToday', [])
       this.$subscribe('unfollowsToday', [])
@@ -243,6 +248,9 @@
       },
       logs() {
         return Logs.find({author: Meteor.userId()}, {sort: {createdAt: -1}})
+      },
+      followsActive() {
+        return Follows.find({author: Meteor.userId(), following: true}).count()
       },
       likesRecent() {
         return Likes.find({author: Meteor.userId()}, {sort: {createdAt: -1}, limit: 10})

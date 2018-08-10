@@ -1,5 +1,5 @@
 <template>
-  <div class="profile" v-if="$subReady.profileId">
+  <div class="profile" v-if="$subReady.profileMy">
     <div class="settings">
       <h3>Settings</h3>
       <form v-on:submit.prevent="saveInstaUsername">
@@ -75,7 +75,7 @@
       }
     },
     mounted () {
-      this.$subscribe('profileId', [this.$route.params.id])
+      this.$subscribe('profileMy', [])
     },
     meteor: {
       profile() {
