@@ -22,6 +22,11 @@ export default [
     component: () => import('/imports/components/accounts/Profile.vue')
   },
   {
+    path: '/admin-panel',
+    name: 'admin-panel',
+    component: () => import('/imports/components/AdminPanel.vue')
+  },
+  {
     path: '/signup',
     name: 'signup',
     component: () => import('/imports/components/accounts/SignUp.vue')
@@ -33,6 +38,7 @@ export default [
   },
   {
     path: '*',
+    name: 'not-found',
     component: () => import('/imports/components/NotFound.vue'),
   }
 ]

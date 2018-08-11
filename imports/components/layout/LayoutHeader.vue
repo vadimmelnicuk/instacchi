@@ -2,9 +2,9 @@
   <header>
     <div class="wrapper">
       <div class="auth">
-        <div v-if="userId">
-          <router-link :to="{name: 'profile', params: {id: userId}}" class="profile">{{ user.username }}</router-link>
-          <button  v-on:click="logout()" class="btn small">Log out</button>
+        <div v-if="$subReady.profileMy && profile">
+          <router-link :to="{name: 'profile', params: {id: profile._id}}" class="profile">{{ profile.username }}</router-link>
+          <button  v-on:click="logout" class="btn small">Log out</button>
         </div>
         <div v-else>
           <router-link :to="{name: 'login'}" class="btn small mr10">Login</router-link>
@@ -26,8 +26,9 @@
       </div>
 
       <div class="nav">
-        <router-link :to="{name: 'dashboard'}" class="mr25" v-if="userId">Dashboard</router-link>
+        <router-link v-if="$subReady.profileMy && profile" :to="{name: 'dashboard'}" class="mr25" >Dashboard</router-link>
         <router-link :to="{name: 'about'}" class="mr25">About</router-link>
+        <router-link v-if="isAdmin" :to="{name: 'admin-panel'}" class="mr25">Admin Panel</router-link>
       </div>
     </div>
   </header>
@@ -38,12 +39,19 @@
 
   export default {
     name: 'layout-header',
+    mounted () {
+      this.$subscribe('profileMy', [])
+    },
     meteor: {
-      userId () {
-        return Meteor.userId()
+      profile () {
+        return Meteor.users.findOne(Meteor.userId())
       },
-      user () {
-        return Meteor.user() ? Meteor.user() : {}
+      isAdmin () {
+        if(Meteor.userId() && this.$subReady.profileMy) {
+          return Meteor.users.findOne(Meteor.userId()).roles.includes('admin')
+        }else{
+          return false
+        }
       }
     },
     methods: {

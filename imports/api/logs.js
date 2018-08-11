@@ -3,7 +3,7 @@ import { check } from 'meteor/check'
 import { Logs } from '/imports/api/collections'
 
 Meteor.publish('logsMy', () => {
-  let logs = Logs.find({author: Meteor.userId()}, {sort: {createdAt: -1}, limit: 100})
+  let logs = Logs.find({author: Meteor.userId()}, {sort: {createdAt: -1}, limit: 70})
   return logs
 })
 

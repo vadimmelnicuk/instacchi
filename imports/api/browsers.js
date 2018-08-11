@@ -3,7 +3,18 @@ import { check } from 'meteor/check'
 import { Browsers } from '/imports/api/collections'
 
 Meteor.publish('browsersAll', () => {
-  return Browsers.find({}, {fields: {cookies: 0}})
+  if(!Meteor.userId() && !Meteor.users.findOne(Meteor.userId()).roles.includes('admin')) {
+    return false
+  }
+
+  let browsers = Browsers.find({}, {fields: {cookies: 0}})
+  let userIds = browsers.map(function(browser) {
+    return browser.author
+  });
+
+  let users = Meteor.users.find({_id: {$in: userIds}}, {fields: {username: 1}})
+
+  return [browsers, users];
 })
 
 Meteor.publish('browserMy', () => {
@@ -73,5 +84,12 @@ Meteor.methods({
     check(code, String)
 
     return Browsers.update({author: Meteor.userId()}, {$set: {code: code}})
+  },
+  browsersStop() {
+    if(!Meteor.userId() && !Meteor.users.findOne(Meteor.userId()).roles.includes('admin')) {
+      throw new Meteor.Error(404, "You are not authorised to do it")
+    }
+
+    return Browsers.update({}, {$set: {processing: false}})
   }
 })

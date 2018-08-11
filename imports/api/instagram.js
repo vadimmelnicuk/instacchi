@@ -1,6 +1,5 @@
 import { Meteor } from 'meteor/meteor'
 import { Random } from 'meteor/random'
-import moment from 'moment'
 import puppeteer from 'puppeteer'
 import aes256 from 'aes256'
 
@@ -86,6 +85,24 @@ Meteor.methods({
     }
 
     await Meteor.call('browserProcessing', Meteor.userId(), false)
+
+    return true
+  },
+  async stopAllTimers() {
+    if(!Meteor.userId() && !Meteor.users.findOne(Meteor.userId()).roles.includes('admin')) {
+      throw new Meteor.Error(404, "You are not allowed to do it")
+    }
+
+    if(timers.length > 0) {
+      // Remove a timer from array
+      timers.map(function(timer) {
+        Meteor.clearInterval(timer.handle)
+        Meteor.call('logSave', {message: '--- STOP --- Scheduler', author: timer.author})
+      })
+      timers = []
+    } else {
+      throw new Meteor.Error(404, "There are no timers to stop")
+    }
 
     return true
   },
@@ -179,7 +196,8 @@ Meteor.methods({
     const stats = await Meteor.call('instaGetUserStats', userId, endpoint, userName)
 
     // Check if in limits
-    if(!stats || stats.followers >= user.settings.maxFollowers || stats.following >= user.settings.maxFollowing || stats.posts < user.settings.minPosts) {
+    // Fix - do not interact with your own account!
+    if(!stats || stats.followers >= user.settings.maxFollowers || stats.following >= user.settings.maxFollowing || stats.posts < user.settings.minPosts || stats.username == user.instaCredentials.username) {
       Meteor.call('logSaveUser', {message: 'User is FILTERED. posts: ' + stats.posts + ', followers: ' + stats.followers + ', following: ' + stats.following + ', url: ' + stats.url, author: userId})
       await Meteor.call('closeBrowsers', userId)
       await Meteor.call('browserProcessing', userId, false)
@@ -316,6 +334,9 @@ Meteor.methods({
       await nav;
 
       const cookies = await page.cookies()
+
+      console.log(cookies)
+
       await Meteor.call('browserSaveCookies', endpoint, cookies)
     }
 

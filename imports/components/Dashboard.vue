@@ -114,7 +114,6 @@
           <div class="controls">
             <button v-on:click="launchBrowser()" class="btn small">Launch browser</button>
             <button v-on:click="closeMyBrowser()" class="btn small">Close my browser</button>
-            <button v-on:click="closeBrowsers()" class="btn small" v-if="isDevelopment">Close all browsers</button><br/>
             <button v-on:click="clearLogs()" class="btn small" v-if="isDevelopment">Clear logs</button>
             <button v-on:click="clearLikes()" class="btn small" v-if="isDevelopment">Clear likes</button>
           </div>
@@ -179,22 +178,6 @@
       No logs
     </div>
 
-    <div v-if="isDevelopment">
-      <h3 >Browsers</h3>
-      <div class="browsers" v-if="$subReady.browsersAll && browsers.length > 0">
-        <div class="browser" v-for="browserItem in browsers" v-bind:key="browserItem._id">
-          <b>{{browserItem.createdAt | readableDate}}</b>
-          {{browserItem.author}}
-          <a v-bind:title="browserItem.endpoint">Socket</a>
-          <span class="active" v-if="browserItem.running">Running</span>
-          <span class="inactive" v-else>Stopped</span>
-          <span class="active" v-if="browserItem.processing">Processing</span>
-        </div>
-      </div>
-      <div class="browsers" v-else>
-        No browsers
-      </div>
-    </div>
   </div>
 </template>
 
@@ -219,7 +202,6 @@
       this.$subscribe('profileMy', [])
       this.$subscribe('profileInstaStatsMy', [])
       this.$subscribe('statsLatest', [])
-      this.$subscribe('browsersAll', [])
       this.$subscribe('browserMy', [])
       this.$subscribe('logsMy', [])
       this.$subscribe('followsMy', [])
@@ -238,9 +220,6 @@
       },
       statsLatest() {
         return instaStats.findOne({author: Meteor.userId()}, {sort: {createdAt: -1}})
-      },
-      browsers() {
-        return Browsers.find({}, {sort: {createdAt: -1}})
       },
       browser() {
         let browser = Browsers.findOne({author: Meteor.userId()})
@@ -321,16 +300,6 @@
           }
         })
       },
-      closeBrowsers() {
-        let self = this
-        Meteor.call('closeBrowsers', function (e, r) {
-          if(e) {
-            self.toast(e.reason)
-          } else {
-            self.toast('All browsers were closed')
-          }
-        })
-      },
       clearLogs() {
         let self = this
         Meteor.call('logsClear', function (e, r) {
@@ -395,5 +364,4 @@
   .active {color: green;}
   .inactive {color: firebrick;}
   .logs {max-height: 300px; height: 300px; margin: 10px 0; padding: 5px; font-size: 0.85rem; overflow-y: scroll; border: 1px solid gainsboro;}
-  .browsers {margin: 10px 0; padding: 5px; border: 1px solid gainsboro;}
 </style>

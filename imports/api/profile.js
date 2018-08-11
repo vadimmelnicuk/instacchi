@@ -9,7 +9,7 @@ Meteor.publish('profileId', (id) => {
 })
 
 Meteor.publish('profileMy', () => {
-  return Meteor.users.find(Meteor.userId(), {fields: {username: 1, profile: 1, createdAt: 1, settings: 1, 'instaCredentials.username': 1}})
+  return Meteor.users.find(Meteor.userId(), {fields: {username: 1, profile: 1, roles: 1, createdAt: 1, settings: 1, 'instaCredentials.username': 1}})
 })
 
 Meteor.publish('profileInstaStatsMy', () => {

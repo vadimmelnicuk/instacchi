@@ -46,6 +46,13 @@ Accounts.onCreateUser((options, user) => {
     password: ''
   }
 
+  user.roles = ['user']
+
+  // First user to register becomes an admin
+  if(Meteor.users.find().count() == 0) {
+    user.roles.push('admin');
+  }
+
   return user
 })
 
