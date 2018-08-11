@@ -3,7 +3,7 @@ import { check } from 'meteor/check'
 import { Logs } from '/imports/api/collections'
 
 Meteor.publish('logsMy', () => {
-  let logs = Logs.find({author: Meteor.userId()}, {sort: {createdAt: -1}, limit: 70})
+  let logs = Logs.find({author: Meteor.userId()}, {sort: {createdAt: -1}, limit: 50})
   return logs
 })
 
@@ -25,6 +25,10 @@ Meteor.methods({
     return Logs.insert(log)
   },
   logsClear() {
-    return Logs.remove({author: Meteor.userId()})
+    if(!Meteor.userId() && !Meteor.users.findOne(Meteor.userId()).roles.includes('admin')) {
+      throw new Meteor.Error(404, "You are not authorised to do it")
+    }
+
+    return Logs.remove({})
   }
 })

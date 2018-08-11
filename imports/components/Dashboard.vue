@@ -111,6 +111,7 @@
           </div>
         </td>
         <td>
+          <b>Controls</b>
           <div class="controls">
             <button v-on:click="launchBrowser()" class="btn small">Launch browser</button>
             <button v-on:click="closeMyBrowser()" class="btn small">Close my browser</button>

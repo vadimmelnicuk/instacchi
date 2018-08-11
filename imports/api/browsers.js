@@ -90,6 +90,6 @@ Meteor.methods({
       throw new Meteor.Error(404, "You are not authorised to do it")
     }
 
-    return Browsers.update({}, {$set: {processing: false}})
+    return Browsers.update({}, {$set: {processing: false}}, {multi: true})
   }
 })

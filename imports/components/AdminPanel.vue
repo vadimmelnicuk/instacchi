@@ -4,6 +4,7 @@
     <div v-if="$subReady.browsersAll" class="controls">
       <button v-on:click="instaAllStop()" class="btn small">Stop all browsers</button>
       <button v-on:click="instaAllStart()" class="btn small">Start all browsers</button>
+      <button v-on:click="clearLogs()" class="btn small">Clear logs</button>
     </div>
 
     <h3 >Browsers</h3>
@@ -20,6 +21,8 @@
     <div class="browsers" v-else>
       No browsers
     </div>
+
+
 
   </div>
   <div class="admin-panel" v-else>
@@ -78,9 +81,19 @@
         })
       },
       instaAllStart() {
+        Browsers.find({running: true}).map(function(browser) {
+          Meteor.call('logSaveUser', {message: '--- START --- Scheduler', author: browser.author})
+          Meteor.call('reviveLoop', browser.author)
+        })
+      },
+      clearLogs() {
         let self = this
-        Browsers.find({}, {running: true, sort: {createdAt: -1}}).map(function(browser) {
-          console.log('test')
+        Meteor.call('logsClear', function (e, r) {
+          if(e) {
+            self.toast(e.reason)
+          } else {
+            self.toast('All logs were removed')
+          }
         })
       }
     },

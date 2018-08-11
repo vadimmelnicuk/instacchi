@@ -28,7 +28,7 @@
       <div class="nav">
         <router-link v-if="$subReady.profileMy && profile" :to="{name: 'dashboard'}" class="mr25" >Dashboard</router-link>
         <router-link :to="{name: 'about'}" class="mr25">About</router-link>
-        <router-link v-if="isAdmin" :to="{name: 'admin-panel'}" class="mr25">Admin Panel</router-link>
+        <router-link v-if="isAdmin" :to="{name: 'admin-panel'}" class="mr25">Admin</router-link>
       </div>
     </div>
   </header>
