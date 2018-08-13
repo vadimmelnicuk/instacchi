@@ -1,6 +1,6 @@
 import { Meteor } from 'meteor/meteor'
 import { check } from 'meteor/check'
-import { Browsers } from '/imports/api/collections'
+import { Browsers, instaStats } from '/imports/api/collections'
 
 Meteor.publish('browsersAll', () => {
   if(!Meteor.userId() && !Meteor.users.findOne(Meteor.userId()).roles.includes('admin')) {
@@ -10,11 +10,16 @@ Meteor.publish('browsersAll', () => {
   let browsers = Browsers.find({}, {fields: {cookies: 0}})
   let userIds = browsers.map(function(browser) {
     return browser.author
-  });
+  })
 
   let users = Meteor.users.find({_id: {$in: userIds}}, {fields: {username: 1}})
+  let instaStatsIds = userIds.map(function(id) {
+    let instaStat = instaStats.findOne({author: id}, {sort: {createdAt: -1}})
+    return instaStat._id
+  })
+  let stats = instaStats.find({_id: {$in: instaStatsIds}})
 
-  return [browsers, users];
+  return [browsers, users, stats]
 })
 
 Meteor.publish('browserMy', () => {

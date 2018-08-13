@@ -9,20 +9,32 @@
 
     <h3 >Browsers</h3>
     <div class="browsers" v-if="$subReady.browsersAll && browsers.length > 0">
-      <div class="browser" v-for="browserItem in browsers" v-bind:key="browserItem._id">
-        <b>{{browserItem.createdAt | readableDate}}</b>
-        <router-link :to="{name: 'profile', params: {id: browserItem.author._id}}">{{ browserItem.author.username }}</router-link>
-        <a v-bind:title="browserItem.endpoint">Socket</a>
-        <span class="green" v-if="browserItem.running">Running</span>
-        <span class="red" v-else>Stopped</span>
-        <span class="green" v-if="browserItem.processing">Processing</span>
-      </div>
+      <table v-for="browser in browsers" v-bind:key="browser._id" class="browser">
+        <tr>
+          <td>
+            <b>{{browser.createdAt | readableDate}}</b>
+          </td>
+          <td>
+            <div>
+              <router-link :to="{name: 'profile', params: {id: browser.author._id}}">{{ browser.author.username }}</router-link>
+              <a v-bind:title="browser.endpoint">Socket</a>
+              <span class="green" v-if="browser.running">Running</span>
+              <span class="red" v-else>Stopped</span>
+              <span class="green" v-if="browser.processing">Processing</span>
+            </div>
+            <div>
+              <a v-bind:href="'https://www.instagram.com/'+browser.instaStats.username+'/'" target="_blank">{{browser.instaStats.username}}</a>
+              <span>posts: {{browser.instaStats.posts}}</span>
+              <span>followers: {{browser.instaStats.followers}}</span>
+              <span>following: {{browser.instaStats.following}}</span>
+            </div>
+          </td>
+        </tr>
+      </table>
     </div>
     <div class="browsers" v-else>
       No browsers
     </div>
-
-
 
   </div>
   <div class="admin-panel" v-else>
@@ -33,7 +45,7 @@
 <script>
   import { Meteor } from 'meteor/meteor'
 
-  import { Browsers } from '/imports/api/collections'
+  import { Browsers, instaStats } from '/imports/api/collections'
 
   export default {
     name: 'admin-panel',
@@ -55,6 +67,7 @@
       browsers() {
         let browsers = Browsers.find({}, {sort: {createdAt: -1}}).map(function(browser) {
           browser.author = Meteor.users.findOne(browser.author)
+          browser.instaStats = instaStats.findOne({author: browser.author._id})
           return browser
         })
 
@@ -108,4 +121,5 @@
 
 <style scoped>
   .browsers {margin: 10px 0; padding: 5px; border: 1px solid gainsboro;}
+  .browsers .browser td {vertical-align: top;}
 </style>
