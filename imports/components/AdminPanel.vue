@@ -13,9 +13,9 @@
         <b>{{browserItem.createdAt | readableDate}}</b>
         <router-link :to="{name: 'profile', params: {id: browserItem.author._id}}">{{ browserItem.author.username }}</router-link>
         <a v-bind:title="browserItem.endpoint">Socket</a>
-        <span class="active" v-if="browserItem.running">Running</span>
-        <span class="inactive" v-else>Stopped</span>
-        <span class="active" v-if="browserItem.processing">Processing</span>
+        <span class="green" v-if="browserItem.running">Running</span>
+        <span class="red" v-else>Stopped</span>
+        <span class="green" v-if="browserItem.processing">Processing</span>
       </div>
     </div>
     <div class="browsers" v-else>
@@ -107,7 +107,5 @@
 </script>
 
 <style scoped>
-  .active {color: green;}
-  .inactive {color: firebrick;}
   .browsers {margin: 10px 0; padding: 5px; border: 1px solid gainsboro;}
 </style>

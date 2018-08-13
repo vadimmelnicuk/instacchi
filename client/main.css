@@ -24,6 +24,10 @@ input:focus {outline: none;}
 .mr25 {margin-right: 25px;}
 .mr10 {margin-right: 10px;}
 
+.green {color: green;}
+.red {color: firebrick;}
+.grey {color: dimgrey;}
+
 @media only screen and (max-width: 1080px) {
     header, main, footer {width: 100%;}
 }

@@ -12,6 +12,11 @@ Meteor.publish('statsLatest', () => {
   return stats
 })
 
+Meteor.publish('statsHistory', (from) => {
+  let stats = instaStats.find({author: Meteor.userId(), createdAt: {$gt: from}}, {sort: {createdAt: -1}})
+  return stats
+})
+
 Meteor.methods({
   statsSave(userId, stats) {
     check(userId, String)

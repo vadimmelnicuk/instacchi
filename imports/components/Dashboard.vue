@@ -6,18 +6,47 @@
         <div class="number">
           <a v-bind:href="'https://www.instagram.com/'+statsLatest.username+'/'" target="_blank">{{statsLatest.username}}</a>
         </div>
+        <div v-if="showChangeInfo" class="change-info">
+          <table v-if="$subReady.statsHistory" class="change-info-stats">
+            <tr>
+              <th>Date</th>
+              <th>Followers</th>
+              <th>Following</th>
+            </tr>
+            <tr v-for="statistic in statsHistory" v-bind:key="statistic._id">
+              <td>{{statistic.createdAt | readableDate}}</td>
+              <td>
+                <span class="change-info-stat">{{statistic.followers}}</span>
+                <span v-bind:class="statistic.followersChange | numberPositivity">{{statistic.followersChange | numberSign}}</span>
+              </td>
+              <td>
+                <span class="change-info-stat">{{statistic.following}}</span>
+                <span v-bind:class="statistic.followingChange | numberPositivity">{{statistic.followingChange | numberSign}}</span>
+              </td>
+            </tr>
+          </table>
+        </div>
       </div>
       <div class="stat">
         Posts
-        <div class="number">{{statsLatest.posts}}</div>
+        <div class="number">
+          {{statsLatest.posts}}
+        </div>
       </div>
       <div class="stat">
         Followers
-        <div class="number">{{statsLatest.followers}}</div>
+        <div class="number">
+          {{statsLatest.followers}}
+        </div>
       </div>
       <div class="stat">
         Following
-        <div class="number">{{statsLatest.following}}</div>
+        <div class="number">
+          {{statsLatest.following}}
+        </div>
+      </div>
+      <div class="stat">
+        <button v-on:click="toggleShowChangeInfo()" class="btn small">Details</button>
       </div>
     </div>
 
@@ -98,7 +127,7 @@
             {{browser.createdAt | readableDate}} <a v-bind:title="browser.endpoint">Socket</a>
             <button v-if="browser.running" v-on:click="instaStop()" class="btn small">Stop</button>
             <button v-else v-on:click="instaRun()" class="btn small">Run</button>
-            <span v-if="browser.processing" class="active"> Processing</span>
+            <span v-if="browser.processing" class="green"> Processing</span>
             <div v-if="browser.verify" class="code">
               <form v-on:submit.prevent="saveCode()">
                 <input type="text" name="code" placeholder="Code">
@@ -189,20 +218,24 @@
 
   let today = new Date()
   let thisHour = new Date()
+  let threeDaysAgo = new Date()
   today.setHours(0, 0, 0, 0)
   thisHour.setMinutes(0, 0, 0)
+  threeDaysAgo.setDate(threeDaysAgo.getDate() - 3)
 
   export default {
     name: 'dashboard',
     data () {
       return {
-        isDevelopment: Meteor.isDevelopment
+        isDevelopment: Meteor.isDevelopment,
+        showChangeInfo: false
       }
     },
     mounted () {
       this.$subscribe('profileMy', [])
       this.$subscribe('profileInstaStatsMy', [])
       this.$subscribe('statsLatest', [])
+      this.$subscribe('statsHistory', [threeDaysAgo])
       this.$subscribe('browserMy', [])
       this.$subscribe('logsMy', [])
       this.$subscribe('followsMy', [])
@@ -221,6 +254,21 @@
       },
       statsLatest() {
         return instaStats.findOne({author: Meteor.userId()}, {sort: {createdAt: -1}})
+      },
+      statsHistory() {
+        let stats = instaStats.find({author: Meteor.userId()}, {sort: {createdAt: -1}}).fetch()
+
+        stats.map(function(statistic, index) {
+          if(index < stats.length-1) {
+            statistic.followersChange = stats[index].followers - stats[index+1].followers
+            statistic.followingChange = stats[index].following - stats[index+1].following
+          }else{
+            statistic.followersChange = 0
+            statistic.followingChange = 0
+          }
+        })
+
+        return stats
       },
       browser() {
         let browser = Browsers.findOne({author: Meteor.userId()})
@@ -330,6 +378,9 @@
             self.toast('The code was saved')
           }
         })
+      },
+      toggleShowChangeInfo(event) {
+        this.showChangeInfo = !this.showChangeInfo
       }
     },
     beforeRouteEnter(to, from, next) {
@@ -349,6 +400,10 @@
   .stats .number .limit {font-size: 1rem;}
   .stats-my {border-bottom: 1px solid gainsboro;}
   .stats-my .stat {display: inline-block; margin-right: 25px; margin-bottom: 20px;}
+  .change-info {position: absolute; z-index: 1; margin-top: 10px; padding: 10px; font-size: 0.85rem; color: black; border: 1px solid gainsboro; background: white;}
+  .change-info .change-info-stats th {text-align: left;}
+  .change-info .change-info-stats td {padding-right: 25px;}
+  .change-info .change-info-stats .change-info-stat {display: inline-block; min-width: 35px;}
   .dashboard {width: 100%; min-height: 85px; padding: 5px; border: 1px solid gainsboro;}
   .dashboard td {width: 50%; vertical-align: top;}
   .dashboard .browser .code {margin-top: 10px;}
@@ -362,7 +417,5 @@
   .follows .follow {margin-bottom: 3px; color: dimgrey;}
   .unfollows .unfollow {margin-bottom: 3px; color: dimgrey;}
   .comments .comment {margin-bottom: 3px; color: dimgrey;}
-  .active {color: green;}
-  .inactive {color: firebrick;}
   .logs {max-height: 300px; height: 300px; margin: 10px 0; padding: 5px; font-size: 0.85rem; overflow-y: scroll; border: 1px solid gainsboro;}
 </style>

@@ -351,8 +351,6 @@ Meteor.methods({
 
       const cookies = await page.cookies()
 
-      console.log(cookies)
-
       await Meteor.call('browserSaveCookies', endpoint, cookies)
     }
 
