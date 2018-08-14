@@ -34,8 +34,12 @@
         <input type="time" id="activitiesUntil" name="activitiesUntil" v-bind:value="profile.settings.activitiesUntil"> (set time in UTC)<br>
         <label for="minPosts">Minimum posts</label>
         <input type="number" id="minPosts" name="minPosts" v-bind:value="profile.settings.minPosts"><br>
+        <label for="minFollowers">Minimum followers</label>
+        <input type="number" id="minFollowers" name="minFollowers" v-bind:value="profile.settings.minFollowers">
         <label for="maxFollowers">Maximum followers</label>
         <input type="number" id="maxFollowers" name="maxFollowers" v-bind:value="profile.settings.maxFollowers"><br>
+        <label for="minFollowing">Minimum following</label>
+        <input type="number" id="minFollowing" name="minFollowing" v-bind:value="profile.settings.minFollowing">
         <label for="maxFollowing">Maximum following</label>
         <input type="number" id="maxFollowing" name="maxFollowing" v-bind:value="profile.settings.maxFollowing"><br>
         <label for="daysToFollow">Days to follow</label>
@@ -93,6 +97,8 @@
           activitiesFrom: event.target.activitiesFrom.value,
           activitiesUntil: event.target.activitiesUntil.value,
           minPosts: parseInt(event.target.minPosts.value),
+          minFollowers: parseInt(event.target.minFollowers.value),
+          minFollowing: parseInt(event.target.minFollowing.value),
           maxFollowers: parseInt(event.target.maxFollowers.value),
           maxFollowing: parseInt(event.target.maxFollowing.value),
           daysToFollow: parseInt(event.target.daysToFollow.value),

@@ -41,7 +41,7 @@ Meteor.methods({
       await page.goto(url)
     }catch (e) {
       Meteor.call('browserInstaRun', false)
-      console.log(e)
+      console.log("Timeout: "+url)
       return false
     }
     await sleepShort()
@@ -138,6 +138,7 @@ Meteor.methods({
     const user = await Meteor.users.findOne(userId, {fields: {settings: 1, instaCredentials: 1}})
     const activitiesFrom = Date.parse('01/01/2001 '+user.settings.activitiesFrom+':00')
     const activitiesUntil = Date.parse('01/01/2001 '+user.settings.activitiesUntil+':00')
+    const currentTime = new Date()
     let today = new Date()
     let time = new Date()
     let thisHour = new Date()
@@ -155,9 +156,15 @@ Meteor.methods({
     const follows = await Follows.find({author: userId, following: true, createdAt: {$gte: thisHour}}).count()
     const unfollows = await Follows.find({author: userId, following: false, createdAt: {$gte: today}}).count()
     const comments = await Comments.find({author: userId, createdAt: {$gte: thisHour}}).count()
+    const follow = await Follows.findOne({author: userId, following: true}, {sort: {createdAt: 1}})
+    const timeToFollow = 1000 * 60 * 60 * 24 * user.settings.daysToFollow
+    let followElapsedTime = 0
+    if(follow) {
+      followElapsedTime = currentTime - follow.createdAt
+    }
 
     // Fix - account for cases when some functionality is disabled
-    if((!user.settings.likesEnabled || likes >= user.settings.likesPerHour) && (!user.settings.followsEnabled || follows >= user.settings.followsPerHour) && (!user.settings.commentsEnabled || comments >= user.settings.commentsPerHour) && (!user.settings.unfollowsEnabled || unfollows > user.settings.unfollowsPerDay)) {
+    if((!user.settings.likesEnabled || likes >= user.settings.likesPerHour) && (!user.settings.followsEnabled || follows >= user.settings.followsPerHour) && (!user.settings.commentsEnabled || comments >= user.settings.commentsPerHour) && (!user.settings.unfollowsEnabled || unfollows > user.settings.unfollowsPerDay || followElapsedTime < timeToFollow)) {
       await Meteor.call('browserProcessing', userId, false)
       return false
     }
@@ -211,9 +218,10 @@ Meteor.methods({
     // Get user's stats
     const stats = await Meteor.call('instaGetUserStats', userId, endpoint, userName)
 
-    // Check if in limits
+    // Check if within limits
     // Fix - do not interact with your own account!
-    if(!stats || stats.followers >= user.settings.maxFollowers || stats.following >= user.settings.maxFollowing || stats.posts < user.settings.minPosts || stats.username === user.instaCredentials.username) {
+    // 14/08/2018 added minimum stats limit
+    if(!stats || stats.followers <= user.settings.minFollowers || stats.followers >= user.settings.maxFollowers || stats.following <= user.settings.minFollowing || stats.following >= user.settings.maxFollowing || stats.posts < user.settings.minPosts || stats.username === user.instaCredentials.username) {
       Meteor.call('logSaveUser', {message: 'User is FILTERED. posts: ' + stats.posts + ', followers: ' + stats.followers + ', following: ' + stats.following + ', url: ' + stats.url, author: userId})
       await Meteor.call('closeBrowsers', userId)
       await Meteor.call('browserProcessing', userId, false)
@@ -257,11 +265,14 @@ Meteor.methods({
       const pages = await browserNew.pages()
       const page = pages[0]
 
+      // Navigation timeout of 10s
+      await page.setDefaultNavigationTimeout(10000)
+
       // Block image display if enabled
       if(!user.settings.imagesShow) {
         await page.setRequestInterception(true)
         page.on('request', request => {
-          if (request.url().endsWith('.png') || request.url().endsWith('.jpg') || request.url().endsWith('.gif')) {
+          if(request.url().endsWith('.png') || request.url().endsWith('.jpg') || request.url().endsWith('.gif')) {
             request.abort()
           }else {
             request.continue()
@@ -280,7 +291,7 @@ Meteor.methods({
       }
 
       await Meteor.call('browserSetEndpoint', browser._id, endpoint)
-      await Meteor.call('logSaveUser', {message: 'Browser launched: ' + endpoint, author: userId})
+      // await Meteor.call('logSaveUser', {message: 'Browser launched: ' + endpoint, author: userId})
 
       return endpoint
     }else{
@@ -409,7 +420,7 @@ Meteor.methods({
     try{
       await page.goto(url)
     }catch (e) {
-      console.log(e)
+      console.log("Timeout: "+url)
       return false
     }
     Meteor.call('logSaveUser', {message: 'Loading page: ' + url, author: userId})
@@ -466,7 +477,7 @@ Meteor.methods({
     try{
       await page.goto(url)
     }catch(e){
-      console.log(e)
+      console.log("Timeout: "+url)
       return false
     }
     Meteor.call('logSaveUser', {message: 'Loading page: ' + url, author: userId})
@@ -491,7 +502,7 @@ Meteor.methods({
     try{
       await page.goBack()
     }catch(e){
-      console.log(e)
+      console.log("Timeout: go back")
       return false
     }
 
@@ -639,7 +650,7 @@ Meteor.methods({
     try{
       await page.goto(follow.userUrl)
     }catch (e) {
-      console.log(e)
+      console.log("Timeout: "+follow.userUrl)
       return false
     }
 
@@ -691,7 +702,7 @@ Meteor.methods({
     try{
       await page.goto(follow.userUrl)
     }catch (e) {
-      console.log(e)
+      console.log("Timeout: "+follow.userUrl)
       return false
     }
 

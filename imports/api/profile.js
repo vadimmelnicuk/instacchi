@@ -36,6 +36,8 @@ Meteor.methods({
       activitiesFrom: String,
       activitiesUntil: String,
       minPosts: Number,
+      minFollowers: Number,
+      minFollowing: Number,
       maxFollowers: Number,
       maxFollowing: Number,
       daysToFollow: Number,
