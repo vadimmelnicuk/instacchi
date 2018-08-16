@@ -26,8 +26,8 @@
             </div>
             <div>
               <a v-bind:href="'https://www.instagram.com/'+browser.instaStats.username+'/'" target="_blank">{{browser.instaStats.username}}</a>
-              <span>posts: {{browser.instaStats.posts}}</span>
-              <span>followers: {{browser.instaStats.followers}}</span>
+              <span>posts: {{browser.instaStats.posts}},</span>
+              <span>followers: {{browser.instaStats.followers}},</span>
               <span>following: {{browser.instaStats.following}}</span>
             </div>
           </td>

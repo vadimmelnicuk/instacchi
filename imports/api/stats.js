@@ -13,7 +13,9 @@ Meteor.publish('statsLatest', () => {
 })
 
 Meteor.publish('statsHistory', (from) => {
-  let stats = instaStats.find({author: Meteor.userId(), createdAt: {$gt: from}}, {sort: {createdAt: -1}})
+  let date = new Date()
+  date.setDate(date.getDate() - from)
+  let stats = instaStats.find({author: Meteor.userId(), createdAt: {$gt: date}}, {sort: {createdAt: -1}})
   return stats
 })
 

@@ -25,6 +25,10 @@ input:focus {outline: none;}
 .mr10 {margin-right: 10px;}
 .ml10 {margin-left: 10px;}
 
+.green {color: green;}
+.red {color: firebrick;}
+.grey {color: dimgrey;}
+
 .label {display: inline-block; padding: 3px 5px; color: white; font-size: 0.8rem;}
 .label.green {background: green;}
 .label.red {background: firebrick;}

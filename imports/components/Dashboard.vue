@@ -239,7 +239,7 @@
       this.$subscribe('profileMy', [])
       this.$subscribe('profileInstaStatsMy', [])
       this.$subscribe('statsLatest', [])
-      this.$subscribe('statsHistory', [Session.get("time").getDate() - 3])
+      this.$subscribe('statsHistory', [3])
       this.$subscribe('browserMy', [])
       this.$subscribe('logsMy', [])
       this.$subscribe('followsMy', [])
@@ -297,25 +297,39 @@
         return Comments.find({author: Meteor.userId()}, {sort: {createdAt: -1}, limit: 10})
       },
       likesToday() {
-        return Likes.find({author: Meteor.userId(), createdAt: {$gte: Session.get("time").setHours(0, 0, 0, 0)}}).count()
+        let date = Session.get("time")
+        date.setHours(0, 0, 0, 0)
+        return Likes.find({author: Meteor.userId(), createdAt: {$gte: date}}).count()
       },
       likesThisHour() {
-        return Likes.find({author: Meteor.userId(), createdAt: {$gte: Session.get("time").setMinutes(0, 0, 0)}}).count()
+        let date = Session.get("time")
+        date.setMinutes(0, 0, 0)
+        return Likes.find({author: Meteor.userId(), createdAt: {$gte: date}}).count()
       },
       followsToday() {
-        return Follows.find({author: Meteor.userId(), following: true, createdAt: {$gte: Session.get("time").setHours(0, 0, 0, 0)}}).count()
+        let date = Session.get("time")
+        date.setHours(0, 0, 0, 0)
+        return Follows.find({author: Meteor.userId(), following: true, createdAt: {$gte: date}}).count()
       },
       followsThisHour() {
-        return Follows.find({author: Meteor.userId(), following: true, createdAt: {$gte: Session.get("time").setMinutes(0, 0, 0)}}).count()
+        let date = Session.get("time")
+        date.setMinutes(0, 0, 0)
+        return Follows.find({author: Meteor.userId(), following: true, createdAt: {$gte: date}}).count()
       },
       unfollowsToday() {
-        return Follows.find({author: Meteor.userId(), following: false, createdAt: {$gte: Session.get("time").setHours(0, 0, 0, 0)}}).count()
+        let date = Session.get("time")
+        date.setHours(0, 0, 0, 0)
+        return Follows.find({author: Meteor.userId(), following: false, createdAt: {$gte: date}}).count()
       },
       commentsToday() {
-        return Comments.find({author: Meteor.userId(), createdAt: {$gte: Session.get("time").setHours(0, 0, 0, 0)}}).count()
+        let date = Session.get("time")
+        date.setHours(0, 0, 0, 0)
+        return Comments.find({author: Meteor.userId(), createdAt: {$gte: date}}).count()
       },
       commentsThisHour() {
-        return Comments.find({author: Meteor.userId(), createdAt: {$gte: Session.get("time").setMinutes(0, 0, 0)}}).count()
+        let date = Session.get("time")
+        date.setMinutes(0, 0, 0)
+        return Comments.find({author: Meteor.userId(), createdAt: {$gte: date}}).count()
       }
     },
     methods: {
