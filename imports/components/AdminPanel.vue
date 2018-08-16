@@ -17,10 +17,12 @@
           <td>
             <div>
               <router-link :to="{name: 'profile', params: {id: browser.author._id}}">{{ browser.author.username }}</router-link>
-              <a v-bind:title="browser.endpoint">Socket</a>
-              <span class="green" v-if="browser.running">Running</span>
-              <span class="red" v-else>Stopped</span>
-              <span class="green" v-if="browser.processing">Processing</span>
+              <a v-bind:title="browser.endpoint">socket</a>
+              <span v-if="browser.running" class="label green">running</span>
+              <span v-else class="label red">stopped</span>
+              <span v-if="browser.processing" class="label green">processing</span>
+              <span v-else class="label grey">paused</span>
+              <span>updated: {{browser.processingDate | fromNow}}</span>
             </div>
             <div>
               <a v-bind:href="'https://www.instagram.com/'+browser.instaStats.username+'/'" target="_blank">{{browser.instaStats.username}}</a>

@@ -5,9 +5,9 @@ Create meteor project
 
 `meteor create --bare instacchi`
 
-Add accounts packages
+Add accounts and session packages
 
-`meteor add accounts-password`
+`meteor add accounts-password session`
 
 Add vue.js package
 

@@ -97,7 +97,7 @@ Meteor.methods({
       try {
         Meteor.call('mainLoop', userId)
       }catch (e) {
-        console.log(e)
+        console.log("Timeout: main loop")
       }
     }, 5000)
 

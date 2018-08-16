@@ -124,10 +124,12 @@
         <td>
           <b>Browser</b>
           <div class="browser" v-if="$subReady.browserMy && browser">
-            {{browser.createdAt | readableDate}} <a v-bind:title="browser.endpoint">Socket</a>
-            <button v-if="browser.running" v-on:click="instaStop()" class="btn small">Stop</button>
-            <button v-else v-on:click="instaRun()" class="btn small">Run</button>
-            <span v-if="browser.processing" class="green"> Processing</span>
+            <span>{{browser.createdAt | readableDate}}</span>
+            <a v-bind:title="browser.endpoint">socket</a>
+            <span v-if="browser.running" class="label green">running</span>
+            <span v-else class="label red">stopped</span>
+            <span v-if="browser.processing" class="label green">processing</span>
+            <span v-else class="label grey">paused</span>
             <div v-if="browser.verify" class="code">
               <form v-on:submit.prevent="saveCode()">
                 <input type="text" name="code" placeholder="Code">
@@ -142,8 +144,10 @@
         <td>
           <b>Controls</b>
           <div class="controls">
-            <button v-on:click="launchBrowser()" class="btn small">Launch browser</button>
-            <button v-on:click="closeMyBrowser()" class="btn small">Close my browser</button>
+            <button v-if="browser && browser.running" v-on:click="instaStop()" class="btn small">Stop</button>
+            <button v-else v-on:click="instaRun()" class="btn small">Run</button>
+            <button v-if="browser.running" v-on:click="closeMyBrowser()" class="btn small">Close my browser</button>
+            <button v-else v-on:click="launchBrowser()" class="btn small">Launch browser</button>
             <button v-on:click="clearLogs()" class="btn small" v-if="isDevelopment">Clear logs</button>
             <button v-on:click="clearLikes()" class="btn small" v-if="isDevelopment">Clear likes</button>
           </div>
@@ -213,15 +217,15 @@
 
 <script>
   import { Meteor } from 'meteor/meteor'
+  import { Session } from 'meteor/session'
 
   import { Browsers, Logs, Likes, Follows, Comments, instaStats } from '/imports/api/collections'
 
-  let today = new Date()
-  let thisHour = new Date()
-  let threeDaysAgo = new Date()
-  today.setHours(0, 0, 0, 0)
-  thisHour.setMinutes(0, 0, 0)
-  threeDaysAgo.setDate(threeDaysAgo.getDate() - 3)
+  // Time session
+  Session.set("time", new Date())
+  Meteor.setInterval(function() {
+    Session.set("time", new Date())
+  }, 60000)
 
   export default {
     name: 'dashboard',
@@ -235,7 +239,7 @@
       this.$subscribe('profileMy', [])
       this.$subscribe('profileInstaStatsMy', [])
       this.$subscribe('statsLatest', [])
-      this.$subscribe('statsHistory', [threeDaysAgo])
+      this.$subscribe('statsHistory', [Session.get("time").getDate() - 3])
       this.$subscribe('browserMy', [])
       this.$subscribe('logsMy', [])
       this.$subscribe('followsMy', [])
@@ -293,25 +297,25 @@
         return Comments.find({author: Meteor.userId()}, {sort: {createdAt: -1}, limit: 10})
       },
       likesToday() {
-        return Likes.find({author: Meteor.userId(), createdAt: {$gte: today}}).count()
+        return Likes.find({author: Meteor.userId(), createdAt: {$gte: Session.get("time").setHours(0, 0, 0, 0)}}).count()
       },
       likesThisHour() {
-        return Likes.find({author: Meteor.userId(), createdAt: {$gte: thisHour}}).count()
+        return Likes.find({author: Meteor.userId(), createdAt: {$gte: Session.get("time").setMinutes(0, 0, 0)}}).count()
       },
       followsToday() {
-        return Follows.find({author: Meteor.userId(), following: true, createdAt: {$gte: today}}).count()
+        return Follows.find({author: Meteor.userId(), following: true, createdAt: {$gte: Session.get("time").setHours(0, 0, 0, 0)}}).count()
       },
       followsThisHour() {
-        return Follows.find({author: Meteor.userId(), following: true, createdAt: {$gte: thisHour}}).count()
+        return Follows.find({author: Meteor.userId(), following: true, createdAt: {$gte: Session.get("time").setMinutes(0, 0, 0)}}).count()
       },
       unfollowsToday() {
-        return Follows.find({author: Meteor.userId(), following: false, createdAt: {$gte: today}}).count()
+        return Follows.find({author: Meteor.userId(), following: false, createdAt: {$gte: Session.get("time").setHours(0, 0, 0, 0)}}).count()
       },
       commentsToday() {
-        return Comments.find({author: Meteor.userId(), createdAt: {$gte: today}}).count()
+        return Comments.find({author: Meteor.userId(), createdAt: {$gte: Session.get("time").setHours(0, 0, 0, 0)}}).count()
       },
       commentsThisHour() {
-        return Comments.find({author: Meteor.userId(), createdAt: {$gte: thisHour}}).count()
+        return Comments.find({author: Meteor.userId(), createdAt: {$gte: Session.get("time").setMinutes(0, 0, 0)}}).count()
       }
     },
     methods: {

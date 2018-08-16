@@ -3,7 +3,7 @@ import { check } from 'meteor/check'
 import { Browsers, instaStats } from '/imports/api/collections'
 
 Meteor.publish('browsersAll', () => {
-  if(!Meteor.userId() && !Meteor.users.findOne(Meteor.userId()).roles.includes('admin')) {
+  if(!Meteor.userId() && !Meteor.users.findOne(Meteor.userId()) && !Meteor.users.findOne(Meteor.userId()).roles.includes('admin')) {
     return false
   }
 
@@ -42,6 +42,7 @@ Meteor.methods({
       cookies: [],
       running: false,
       processing: false,
+      processingDate: new Date(),
       verify: false,
       code: ''
     }
@@ -60,9 +61,6 @@ Meteor.methods({
   browserRemoveEndpoint(endpoint) {
     return Browsers.remove({endpoint: endpoint})
   },
-  browsersRemove() {
-    return Browsers.remove({})
-  },
   browserInstaRun(state) {
     check(state, Boolean)
 
@@ -77,7 +75,7 @@ Meteor.methods({
     check(userId, String)
     check(state, Boolean)
 
-    return Browsers.update({author: userId}, {$set: {processing: state}})
+    return Browsers.update({author: userId}, {$set: {processing: state, processingDate: new Date()}})
   },
   browserVerify(endpoint, state) {
     check(endpoint, String)
@@ -91,10 +89,10 @@ Meteor.methods({
     return Browsers.update({author: Meteor.userId()}, {$set: {code: code}})
   },
   browsersStop() {
-    if(!Meteor.userId() && !Meteor.users.findOne(Meteor.userId()).roles.includes('admin')) {
+    if(!Meteor.userId() && !Meteor.users.findOne(Meteor.userId()) && !Meteor.users.findOne(Meteor.userId()).roles.includes('admin')) {
       throw new Meteor.Error(404, "You are not authorised to do it")
     }
 
-    return Browsers.update({}, {$set: {processing: false}}, {multi: true})
+    return Browsers.update({}, {$set: {processing: false, processingDate: new Date()}}, {multi: true})
   }
 })
