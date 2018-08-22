@@ -19,6 +19,27 @@ Meteor.publish('statsHistory', (from) => {
   return stats
 })
 
+Meteor.publish('statsMonth', () => {
+  let dates = []
+  for(let x = 0; x <= 30; x++) {
+    let date = new Date()
+    date.setHours(24, 59, 0, 0)
+    date.setDate(date.getDate() - x)
+    dates.push(date)
+  }
+
+  let statIds = []
+  dates.map(function(day) {
+    let stat = instaStats.findOne({author: Meteor.userId(), createdAt: {$lt: day}}, {sort: {createdAt: -1}})
+    if(stat && !statIds.includes(stat._id)) {
+      statIds.push(stat._id)
+    }
+  })
+
+  let stats = instaStats.find({_id: {$in: statIds}}, {sort: {createdAt: -1}})
+  return stats
+})
+
 Meteor.methods({
   statsSave(userId, stats) {
     check(userId, String)

@@ -2,3 +2,5 @@ node_modules/
 .meteor/
 .idea/
 .deploy/
+
+.DS_Store

@@ -35,18 +35,18 @@ Meteor.methods({
     const browserHandle = await puppeteer.connect({browserWSEndpoint: endpoint})
     const pages = await browserHandle.pages()
     const page = pages[0]
-    const url = "https://www.instagram.com/accounts/login/"
+    const url = "https://instagram.com/accounts/login/"
     const userId = Meteor.userId()
     try{
       await page.goto(url)
     }catch (e) {
       Meteor.call('browserInstaRun', false)
-      console.log("Timeout: "+url)
+      console.log("Timeout: "+url+" time: "+new Date())
       return false
     }
     await sleepShort()
-    await Meteor.call('instaLogin', userId, endpoint)
-    await Meteor.call('closeBrowsers', userId)
+    Meteor.call('instaLogin', userId, endpoint)
+    Meteor.call('closeBrowsers', userId)
 
     // Setup the timer
     let timer = {}
@@ -56,6 +56,7 @@ Meteor.methods({
       try {
         Meteor.call('mainLoop', userId)
       }catch (e) {
+        console.log("Timeout: main loop"+" time: "+new Date())
         console.log(e)
       }
     }, 5000)
@@ -84,7 +85,7 @@ Meteor.methods({
       Meteor.call('logSave', {message: '--- STOP --- Scheduler'})
     }
 
-    await Meteor.call('browserProcessing', Meteor.userId(), false)
+    Meteor.call('browserProcessing', Meteor.userId(), false)
 
     return true
   },
@@ -97,12 +98,15 @@ Meteor.methods({
       try {
         Meteor.call('mainLoop', userId)
       }catch (e) {
-        console.log("Timeout: main loop")
+        console.log("Timeout: main loop"+" time: "+new Date())
+        console.log(e)
       }
     }, 5000)
 
     // Store the timer
     timers.push(timer)
+
+    return true
   },
   async stopAllTimers() {
     if(!Meteor.userId() && !Meteor.users.findOne(Meteor.userId()).roles.includes('admin')) {
@@ -132,10 +136,10 @@ Meteor.methods({
     }
 
     // START
-    await Meteor.call('browserProcessing', userId, true)
+    Meteor.call('browserProcessing', userId, true)
 
     // Check if within like/follow/unfollow limits
-    const user = await Meteor.users.findOne(userId, {fields: {settings: 1, instaCredentials: 1}})
+    const user = Meteor.users.findOne(userId, {fields: {settings: 1, instaCredentials: 1}})
     const activitiesFrom = Date.parse('01/01/2001 '+user.settings.activitiesFrom+':00')
     const activitiesUntil = Date.parse('01/01/2001 '+user.settings.activitiesUntil+':00')
     const currentTime = new Date()
@@ -148,15 +152,15 @@ Meteor.methods({
 
     // Check whether we are inside a time window to do actions
     if(time < activitiesFrom || time > activitiesUntil) {
-      await Meteor.call('browserProcessing', userId, false)
+      Meteor.call('browserProcessing', userId, false)
       return false
     }
 
-    const likes = await Likes.find({author: userId, createdAt: {$gte: thisHour}}).count()
-    const follows = await Follows.find({author: userId, following: true, createdAt: {$gte: thisHour}}).count()
-    const unfollows = await Follows.find({author: userId, following: false, createdAt: {$gte: today}}).count()
-    const comments = await Comments.find({author: userId, createdAt: {$gte: thisHour}}).count()
-    const follow = await Follows.findOne({author: userId, following: true}, {sort: {createdAt: 1}})
+    const likes = Likes.find({author: userId, createdAt: {$gte: thisHour}}).count()
+    const follows = Follows.find({author: userId, following: true, createdAt: {$gte: thisHour}}).count()
+    const unfollows = Follows.find({author: userId, following: false, createdAt: {$gte: today}}).count()
+    const comments = Comments.find({author: userId, createdAt: {$gte: thisHour}}).count()
+    const follow = Follows.findOne({author: userId, following: true}, {sort: {createdAt: 1}})
     const timeToFollow = 1000 * 60 * 60 * 24 * user.settings.daysToFollow
     let followElapsedTime = 0
     if(follow) {
@@ -165,27 +169,27 @@ Meteor.methods({
 
     // Fix - account for cases when some functionality is disabled
     if((!user.settings.likesEnabled || likes >= user.settings.likesPerHour) && (!user.settings.followsEnabled || follows >= user.settings.followsPerHour) && (!user.settings.commentsEnabled || comments >= user.settings.commentsPerHour) && (!user.settings.unfollowsEnabled || unfollows > user.settings.unfollowsPerDay || followElapsedTime < timeToFollow)) {
-      await Meteor.call('browserProcessing', userId, false)
+      Meteor.call('browserProcessing', userId, false)
       return false
     }
 
     // Launch a browser
     Meteor.call('logSaveUser', {message: '--- Running insta main loop', author: userId})
-    const endpoint = await Meteor.call('launchBrowser', userId)
+    const endpoint = Meteor.call('launchBrowser', userId)
 
     // Check the user is logged in and log in if not
-    const login = await Meteor.call('instaLogin', userId, endpoint)
+    const login = Meteor.call('instaLogin', userId, endpoint)
     if(!login) {
-      await Meteor.call('closeBrowsers', userId)
-      await Meteor.call('browserProcessing', userId, false)
+      Meteor.call('closeBrowsers', userId)
+      Meteor.call('browserProcessing', userId, false)
       return false
     }
 
     // Get my stats routine
-    const statsMy = await instaStats.findOne({author: userId, createdAt: {$gte: thisHour}})
+    const statsMy = instaStats.findOne({author: userId, createdAt: {$gte: thisHour}})
     if(!statsMy) {
       Meteor.call('logSaveUser', {message: '--- Running insta get my stats', author: userId})
-      const statsHandle = await Meteor.call('instaGetUserStats', userId, endpoint, user.instaCredentials.username)
+      const statsHandle = Meteor.call('instaGetUserStats', userId, endpoint, user.instaCredentials.username)
       if(statsHandle) {
         Meteor.call('statsSave', userId, statsHandle)
       }
@@ -193,13 +197,13 @@ Meteor.methods({
 
     // Unfollow routine
     if(user.settings.unfollowsEnabled && unfollows < user.settings.unfollowsPerDay) {
-      let unfollow = await Meteor.call('instaUnfollow', userId, endpoint)
+      let unfollow = Meteor.call('instaUnfollow', userId, endpoint)
     }
 
     // Check if all other actions are disabled or over the limit
     if((!user.settings.likesEnabled || likes >= user.settings.likesPerHour) && (!user.settings.followsEnabled || follows >= user.settings.followsPerHour) && (!user.settings.commentsEnabled || comments >= user.settings.commentsPerHour)) {
-      await Meteor.call('closeBrowsers', userId)
-      await Meteor.call('browserProcessing', userId, false)
+      Meteor.call('closeBrowsers', userId)
+      Meteor.call('browserProcessing', userId, false)
       return false
     }
 
@@ -208,23 +212,23 @@ Meteor.methods({
     const tag = Random.choice(tags)
 
     // Go to the tag and get user's name
-    const userName = await Meteor.call('instaPickFromTag', userId, endpoint, tag)
+    const userName = Meteor.call('instaPickFromTag', userId, endpoint, tag)
     if(!userName) {
-      await Meteor.call('closeBrowsers', userId)
-      await Meteor.call('browserProcessing', userId, false)
+      Meteor.call('closeBrowsers', userId)
+      Meteor.call('browserProcessing', userId, false)
       return false
     }
 
     // Get user's stats
-    const stats = await Meteor.call('instaGetUserStats', userId, endpoint, userName)
+    const stats = Meteor.call('instaGetUserStats', userId, endpoint, userName)
 
     // Check if within limits
     // Fix - do not interact with your own account!
     // 14/08/2018 added minimum stats limit
     if(!stats || stats.followers <= user.settings.minFollowers || stats.followers >= user.settings.maxFollowers || stats.following <= user.settings.minFollowing || stats.following >= user.settings.maxFollowing || stats.posts < user.settings.minPosts || stats.username === user.instaCredentials.username) {
       Meteor.call('logSaveUser', {message: 'User is FILTERED. posts: ' + stats.posts + ', followers: ' + stats.followers + ', following: ' + stats.following + ', url: ' + stats.url, author: userId})
-      await Meteor.call('closeBrowsers', userId)
-      await Meteor.call('browserProcessing', userId, false)
+      Meteor.call('closeBrowsers', userId)
+      Meteor.call('browserProcessing', userId, false)
       return false
     }
 
@@ -232,27 +236,27 @@ Meteor.methods({
 
     // Like routine
     if(user.settings.likesEnabled && likes < user.settings.likesPerHour) {
-      await Meteor.call('instaLike', userId, endpoint, stats.username, stats.url, tag)
+      Meteor.call('instaLike', userId, endpoint, stats.username, stats.url, tag)
     }
 
     // Follow routine
     if(user.settings.followsEnabled && follows < user.settings.followsPerHour) {
-      await Meteor.call('instaFollow', userId, endpoint, stats.username, stats.url, tag)
+      Meteor.call('instaFollow', userId, endpoint, stats.username, stats.url, tag)
     }
 
     // Comment routine
     if(user.settings.commentsEnabled && comments < user.settings.commentsPerHour) {
-      await Meteor.call('instaComment', userId, endpoint, stats.username, stats.url, tag)
+      Meteor.call('instaComment', userId, endpoint, stats.username, stats.url, tag)
     }
 
     // END
-    await Meteor.call('closeBrowsers', userId)
-    await Meteor.call('browserProcessing', userId, false)
+    Meteor.call('closeBrowsers', userId)
+    Meteor.call('browserProcessing', userId, false)
     return true
   },
   async launchBrowser(userId) {
-    const browser = await Browsers.findOne({author: userId})
-    const user = await Meteor.users.findOne(userId, {fields: {settings: 1}})
+    const browser = Browsers.findOne({author: userId})
+    const user = Meteor.users.findOne(userId, {fields: {settings: 1}})
     const config = {
       headless: !user.settings.browserShow,
       // Possible fix of chromium not running in docker linux. However, it could potentially affect overall safety.
@@ -274,13 +278,13 @@ Meteor.methods({
         page.on('request', request => {
           if(request.url().endsWith('.png') || request.url().endsWith('.jpg') || request.url().endsWith('.gif')) {
             request.abort()
-          }else {
+          }else{
             request.continue()
           }
         })
       }
 
-      // Set cookiesa
+      // Set cookies
       if(browser.cookies.length > 0) {
         browser.cookies.forEach(async function(cookie) {
           await page.setCookie(cookie)
@@ -290,7 +294,7 @@ Meteor.methods({
         Meteor.call('logSaveUser', {message: '--- No cookies were found', author: userId})
       }
 
-      await Meteor.call('browserSetEndpoint', browser._id, endpoint)
+      Meteor.call('browserSetEndpoint', browser._id, endpoint)
       // await Meteor.call('logSaveUser', {message: 'Browser launched: ' + endpoint, author: userId})
 
       return endpoint
@@ -362,7 +366,7 @@ Meteor.methods({
 
       const cookies = await page.cookies()
 
-      await Meteor.call('browserSaveCookies', endpoint, cookies)
+      Meteor.call('browserSaveCookies', endpoint, cookies)
     }
 
     // Check for suspicious login messages
@@ -411,6 +415,7 @@ Meteor.methods({
   async instaPickFromTag(userId, endpoint, tag) {
     // Init browser and page
     Meteor.call('logSaveUser', {message: '--- Running insta pick from tag #' + tag, author: userId})
+
     const browserHandle = await puppeteer.connect({browserWSEndpoint: endpoint})
     const pages = await browserHandle.pages()
     const page = pages[0]
@@ -420,7 +425,7 @@ Meteor.methods({
     try{
       await page.goto(url)
     }catch (e) {
-      console.log("Timeout: "+url)
+      console.log("Timeout: "+url+" time: "+new Date())
       return false
     }
     Meteor.call('logSaveUser', {message: 'Loading page: ' + url, author: userId})
@@ -442,7 +447,12 @@ Meteor.methods({
     }
 
     // Scroll down to get more images
-    await images[images.length-1].hover()
+    try {
+      await images[images.length-1].hover()
+    }catch (e) {
+      console.log("Timeout: hover image, time: "+new Date())
+      return false
+    }
     await sleepShort()
     images = await page.$x(query)
     if(images.length == 0) {
@@ -450,10 +460,17 @@ Meteor.methods({
     }
 
     // Click a random image
-    const imageNumber = await getRandomIntInclusive(9, images.length-1)
-    await images[imageNumber].click()
+    const imageNumber = getRandomIntInclusive(9, images.length-1)
+    const navigationPromise = page.waitForNavigation()
+    try {
+      await images[imageNumber].click()
+    }catch (e) {
+      console.log("Timeout: click image, time: "+new Date())
+      return false
+    }
+    await navigationPromise
 
-    await sleepShort()
+    await sleepLong()
 
     // Get user's name
     query = "//a[contains(@class, 'FPmhX') and contains(@class, 'nJAzx')]"
@@ -477,7 +494,7 @@ Meteor.methods({
     try{
       await page.goto(url)
     }catch(e){
-      console.log("Timeout: "+url)
+      console.log("Timeout: "+url+" time: "+new Date())
       return false
     }
     Meteor.call('logSaveUser', {message: 'Loading page: ' + url, author: userId})
@@ -502,7 +519,7 @@ Meteor.methods({
     try{
       await page.goBack()
     }catch(e){
-      console.log("Timeout: go back")
+      console.log("Timeout: go back"+" time: "+new Date())
       return false
     }
 
@@ -560,20 +577,20 @@ Meteor.methods({
 
     // Click for a like
     await likeButton[0].click()
-    await Meteor.call('likeSave', {url: url, photo: photo._remoteObject.value, userName: userName, userUrl: userUrl, author: userId, tag: tag})
+    Meteor.call('likeSave', {url: url, photo: photo._remoteObject.value, userName: userName, userUrl: userUrl, author: userId, tag: tag})
 
     return true
   },
   async instaFollow(userId, endpoint, userName, userUrl, tag) {
     //Only follow once
-    const follows = await Follows.find({author: userId, userName: userName}).fetch()
+    const follows = Follows.find({author: userId, userName: userName}).fetch()
     if(follows.length > 0) {
       return false
     }
 
     // Check whether we are over follow rate threshold
-    const user = await Meteor.users.findOne(userId, {fields: {settings: 1}})
-    const follow = await Follows.findOne({author: userId, following: true}, {sort: {createdAt: -1}})
+    const user = Meteor.users.findOne(userId, {fields: {settings: 1}})
+    const follow = Follows.findOne({author: userId, following: true}, {sort: {createdAt: -1}})
     if(follow) {
       const currentTime = new Date()
       const elapsedTime = currentTime - follow.createdAt
@@ -607,14 +624,14 @@ Meteor.methods({
 
     // Click follow
     await followButton[0].click()
-    await Meteor.call('follow.save', {author: userId, userName: userName, userUrl: userUrl, tag: tag})
+    Meteor.call('follow.save', {author: userId, userName: userName, userUrl: userUrl, tag: tag})
 
     return true
   },
   async instaUnfollow(userId, endpoint) {
     // Check whether we followed this user long enough
-    const user = await Meteor.users.findOne(userId, {fields: {settings: 1}})
-    const follow = await Follows.findOne({author: userId, following: true}, {sort: {createdAt: 1}})
+    const user = Meteor.users.findOne(userId, {fields: {settings: 1}})
+    const follow = Follows.findOne({author: userId, following: true}, {sort: {createdAt: 1}})
     if(follow) {
       const timeToFollow = 1000 * 60 * 60 * 24 * user.settings.daysToFollow
       const currentTime = new Date()
@@ -628,7 +645,7 @@ Meteor.methods({
     }
 
     // Check whether we are over unfollow rate threshold
-    const unfollow = await Follows.findOne({author: userId, following: false}, {sort: {createdAt: -1}})
+    const unfollow = Follows.findOne({author: userId, following: false}, {sort: {createdAt: -1}})
     if(unfollow) {
       const currentTime = new Date()
       const elapsedTime = currentTime - unfollow.createdAt
@@ -650,7 +667,7 @@ Meteor.methods({
     try{
       await page.goto(follow.userUrl)
     }catch (e) {
-      console.log("Timeout: "+follow.userUrl)
+      console.log("Timeout: "+follow.userUrl+" time: "+new Date())
       return false
     }
 
@@ -702,7 +719,7 @@ Meteor.methods({
     try{
       await page.goto(follow.userUrl)
     }catch (e) {
-      console.log("Timeout: "+follow.userUrl)
+      console.log("Timeout: "+follow.userUrl+" time: "+new Date())
       return false
     }
 
@@ -720,14 +737,14 @@ Meteor.methods({
   },
   async instaComment(userId, endpoint, userName, userUrl, tag) {
     //Only comment once
-    const comments = await Comments.find({author: userId, userName: userName}).fetch()
+    const comments = Comments.find({author: userId, userName: userName}).fetch()
     if(comments.length > 0) {
       return false
     }
 
     // Check whether we are over comment rate threshold
-    const user = await Meteor.users.findOne(userId, {fields: {settings: 1}})
-    const comment = await Comments.findOne({author: userId}, {sort: {createdAt: -1}})
+    const user = Meteor.users.findOne(userId, {fields: {settings: 1}})
+    const comment = Comments.findOne({author: userId}, {sort: {createdAt: -1}})
     if(comment) {
       const currentTime = new Date()
       const elapsedTime = currentTime - comment.createdAt
@@ -765,7 +782,7 @@ Meteor.methods({
     await commentTextarea[0].type(generatedComment, {delay: 25})
     await sleepShort()
     await commentTextarea[0].press('Enter')
-    await Meteor.call('comment.save', {message: generatedComment, url: url, author: userId, userName: userName, userUrl: userUrl, tag: tag})
+    Meteor.call('comment.save', {message: generatedComment, url: url, author: userId, userName: userName, userUrl: userUrl, tag: tag})
 
     return true
   },
@@ -784,12 +801,12 @@ async function sleep(ms) {
 }
 
 async function sleepShort() {
-  let time = await getRandomIntInclusive(500, 800)
+  let time = getRandomIntInclusive(500, 800)
   return new Promise(resolve => Meteor.setTimeout(resolve, time))
 }
 
 async function sleepMedium() {
-  let time = await getRandomIntInclusive(1000, 2500)
+  let time = getRandomIntInclusive(1000, 2500)
   return new Promise(resolve => Meteor.setTimeout(resolve, time))
 }
 
@@ -798,7 +815,7 @@ async function sleepLong() {
   return new Promise(resolve => Meteor.setTimeout(resolve, time))
 }
 
-async function getRandomIntInclusive(min, max) {
+function getRandomIntInclusive(min, max) {
   min = Math.ceil(min);
   max = Math.floor(max);
   return Math.floor(Math.random() * (max - min + 1)) + min

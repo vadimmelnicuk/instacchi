@@ -82,7 +82,7 @@
         Meteor.call('stopAllTimers', function (e, r) {
           if(e) {
             self.toast(e.reason)
-          } else {
+          }else{
             self.toast('All timers were stopped')
           }
         })
@@ -90,16 +90,22 @@
         Meteor.call('browsersStop', function (e, r) {
           if(e) {
             self.toast(e.reason)
-          } else {
+          }else{
             self.toast('All browsers were stopped')
           }
         })
       },
       instaAllStart() {
+        let self = this
         Browsers.find({running: true}).map(function(browser) {
           Meteor.call('logSaveUser', {message: '--- START --- Scheduler', author: browser.author})
-          Meteor.call('reviveLoop', browser.author)
+          Meteor.call('reviveLoop', browser.author, function (e, r) {
+            if(e) {
+              self.toast(e.reason)
+            }
+          })
         })
+        self.toast('All timers were launched')
       },
       clearLogs() {
         let self = this

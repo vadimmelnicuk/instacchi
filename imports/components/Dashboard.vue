@@ -7,13 +7,35 @@
           <a v-bind:href="'https://www.instagram.com/'+statsLatest.username+'/'" target="_blank">{{statsLatest.username}}</a>
         </div>
         <div v-if="showChangeInfo" class="change-info">
-          <table v-if="$subReady.statsHistory" class="change-info-stats">
+          <div class="controls">
+            <button v-on:click="showStatsThreeDays()" class="btn small">Last 3 days</button>
+            <button v-on:click="showStatsMonth()" class="btn small">Last 30 days</button>
+          </div>
+          <table v-if="showStatsType === 1 && $subReady.statsHistory" class="change-info-stats">
             <tr>
               <th>Date</th>
               <th>Followers</th>
               <th>Following</th>
             </tr>
             <tr v-for="statistic in statsHistory" v-bind:key="statistic._id">
+              <td>{{statistic.createdAt | readableDate}}</td>
+              <td>
+                <span class="change-info-stat">{{statistic.followers}}</span>
+                <span v-bind:class="statistic.followersChange | numberPositivity">{{statistic.followersChange | numberSign}}</span>
+              </td>
+              <td>
+                <span class="change-info-stat">{{statistic.following}}</span>
+                <span v-bind:class="statistic.followingChange | numberPositivity">{{statistic.followingChange | numberSign}}</span>
+              </td>
+            </tr>
+          </table>
+          <table v-if="showStatsType === 2 && $subReady.statsMonth" class="change-info-stats">
+            <tr>
+              <th>Date</th>
+              <th>Followers</th>
+              <th>Following</th>
+            </tr>
+            <tr v-for="statistic in statsMonth" v-bind:key="statistic._id">
               <td>{{statistic.createdAt | readableDate}}</td>
               <td>
                 <span class="change-info-stat">{{statistic.followers}}</span>
@@ -232,7 +254,8 @@
     data () {
       return {
         isDevelopment: Meteor.isDevelopment,
-        showChangeInfo: false
+        showChangeInfo: false,
+        showStatsType: 1
       }
     },
     mounted () {
@@ -240,6 +263,7 @@
       this.$subscribe('profileInstaStatsMy', [])
       this.$subscribe('statsLatest', [])
       this.$subscribe('statsHistory', [3])
+      this.$subscribe('statsMonth', [])
       this.$subscribe('browserMy', [])
       this.$subscribe('logsMy', [])
       this.$subscribe('followsMy', [])
@@ -260,7 +284,43 @@
         return instaStats.findOne({author: Meteor.userId()}, {sort: {createdAt: -1}})
       },
       statsHistory() {
-        let stats = instaStats.find({author: Meteor.userId()}, {sort: {createdAt: -1}}).fetch()
+        // Get stats for the last three days
+        let date = Session.get("time")
+        date.setDate(date.getDate() - 3)
+
+        let stats = instaStats.find({author: Meteor.userId(), createdAt: {$gt: date}}, {sort: {createdAt: -1}}).fetch()
+
+        stats.map(function(statistic, index) {
+          if(index < stats.length-1) {
+            statistic.followersChange = stats[index].followers - stats[index+1].followers
+            statistic.followingChange = stats[index].following - stats[index+1].following
+          }else{
+            statistic.followersChange = 0
+            statistic.followingChange = 0
+          }
+        })
+
+        return stats
+      },
+      statsMonth() {
+        // Get daily stats for the last months
+        let dates = []
+        for(let x = 0; x <= 30; x++) {
+          let date = Session.get("time")
+          date.setHours(24, 59, 0, 0)
+          date.setDate(date.getDate() - x)
+          dates.push(date)
+        }
+
+        let statIds = []
+        dates.map(function(day) {
+          let stat = instaStats.findOne({author: Meteor.userId(), createdAt: {$lt: day}}, {sort: {createdAt: -1}})
+          if(stat && !statIds.includes(stat._id)) {
+            statIds.push(stat._id)
+          }
+        })
+
+        let stats = instaStats.find({_id: {$in: statIds}}, {sort: {createdAt: -1}}).fetch()
 
         stats.map(function(statistic, index) {
           if(index < stats.length-1) {
@@ -399,6 +459,12 @@
       },
       toggleShowChangeInfo(event) {
         this.showChangeInfo = !this.showChangeInfo
+      },
+      showStatsThreeDays(event) {
+        this.showStatsType = 1
+      },
+      showStatsMonth(event) {
+        this.showStatsType = 2
       }
     },
     beforeRouteEnter(to, from, next) {
@@ -418,6 +484,7 @@
   .stats .number .limit {font-size: 1rem;}
   .stats-my {border-bottom: 1px solid gainsboro;}
   .stats-my .stat {display: inline-block; margin-right: 25px; margin-bottom: 20px;}
+  .stats-my .controls {margin-bottom: 5px;}
   .change-info {position: absolute; z-index: 1; margin-top: 10px; padding: 10px; font-size: 0.85rem; color: black; border: 1px solid gainsboro; background: white;}
   .change-info .change-info-stats th {text-align: left;}
   .change-info .change-info-stats td {padding-right: 25px;}
