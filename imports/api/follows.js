@@ -55,6 +55,15 @@ Meteor.methods({
 
     return Follows.update(id, {$set: {createdAt: new Date(), following: false}})
   },
+  'follow.unfollowRemoved'(id) {
+    check(id, String)
+
+    let follow = Follows.findOne(id)
+
+    Meteor.users.update(follow.author, {$inc: {'instaStats.totalUnfollows': 1}})
+
+    return Follows.update(id, {$set: {createdAt: new Date(), following: false, removed: true}})
+  },
   'follow.remove'(id) {
     check(id, String)
 
