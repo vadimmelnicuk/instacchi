@@ -19,8 +19,10 @@
           <label for="browserShow">Show browser</label>
           <input type="checkbox" id="browserShow" name="browserShow" v-model="profile.settings.browserShow">
           <label for="imagesShow">Show images</label>
-          <input type="checkbox" id="imagesShow" name="imagesShow" v-model="profile.settings.imagesShow"><br><br>
+          <input type="checkbox" id="imagesShow" name="imagesShow" v-model="profile.settings.imagesShow">
         </div>
+        <label for="proxyEnabled">Use proxy</label>
+        <input type="checkbox" id="proxyEnabled" name="proxyEnabled" v-model="profile.settings.proxyEnabled"><br><br>
         <label for="likesEnabled">Liking</label>
         <input type="checkbox" id="likesEnabled" name="likesEnabled" v-model="profile.settings.likesEnabled">
         <label for="followsEnabled">Following</label>
@@ -50,6 +52,8 @@
         <input type="number" id="followsPerHour" name="followsPerHour" v-bind:value="profile.settings.followsPerHour"><br>
         <label for="commentsPerHour">Comments per hour</label>
         <input type="number" id="commentsPerHour" name="commentsPerHour" v-bind:value="profile.settings.commentsPerHour"><br>
+        <label for="likeRate">Like rate in seconds</label>
+        <input type="number" id="likeRate" name="likeRate" v-bind:value="profile.settings.likeRate"><br>
         <label for="followRate">Follow rate in seconds</label>
         <input type="number" id="followRate" name="followRate" v-bind:value="profile.settings.followRate"><br>
         <label for="unfollowRate">Unfollow rate in seconds</label>
@@ -94,6 +98,7 @@
           followsEnabled: event.target.followsEnabled.checked,
           unfollowsEnabled: event.target.unfollowsEnabled.checked,
           commentsEnabled: event.target.commentsEnabled.checked,
+          proxyEnabled: event.target.proxyEnabled.checked,
           activitiesFrom: event.target.activitiesFrom.value,
           activitiesUntil: event.target.activitiesUntil.value,
           minPosts: parseInt(event.target.minPosts.value),
@@ -105,6 +110,7 @@
           likesPerHour: parseInt(event.target.likesPerHour.value),
           followsPerHour: parseInt(event.target.followsPerHour.value),
           commentsPerHour: parseInt(event.target.commentsPerHour.value),
+          likeRate: parseInt(event.target.likeRate.value),
           followRate: parseInt(event.target.followRate.value),
           unfollowRate: parseInt(event.target.unfollowRate.value),
           commentRate: parseInt(event.target.commentRate.value),

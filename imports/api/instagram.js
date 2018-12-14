@@ -25,6 +25,19 @@ Meteor.methods({
       return false
     }
 
+    // Get browser endpoint
+    const endpoint = Meteor.call('launchBrowser', userId)
+
+    // Check the user is logged in and log in if not
+    const loginStatus = await Meteor.call('instaCheckLoginStatus', userId, endpoint)
+    if(!loginStatus) {
+      throw new Meteor.Error(404, "Failed to get login status")
+    }
+
+    // Close browser
+    Meteor.call('closeBrowsers', userId)
+    Meteor.call('browserProcessing', userId, false)
+
     // Setup the timer
     let timer = {}
     timer.author = userId
@@ -33,7 +46,7 @@ Meteor.methods({
       try {
         Meteor.call('mainLoop', userId)
       }catch (e) {
-        console.log("Timeout: main loop time: "+new Date())
+        console.log("Timeout: main loop time: " + new Date())
         console.log(e)
       }
     }, 5000)
@@ -113,7 +126,7 @@ Meteor.methods({
     }
 
     // START
-    Meteor.call('browserProcessing', userId, true)
+    await Meteor.call('browserProcessing', userId, true)
 
     // Check if within like/follow/unfollow limits
     const user = Meteor.users.findOne(userId, {fields: {settings: 1, instaCredentials: 1}})
@@ -145,7 +158,10 @@ Meteor.methods({
     }
 
     // Fix - account for cases when some functionality is disabled
-    if((!user.settings.likesEnabled || likes >= user.settings.likesPerHour) && (!user.settings.followsEnabled || follows >= user.settings.followsPerHour) && (!user.settings.commentsEnabled || comments >= user.settings.commentsPerHour) && (!user.settings.unfollowsEnabled || unfollows > user.settings.unfollowsPerDay || followElapsedTime < timeToFollow)) {
+    if((!user.settings.likesEnabled || likes >= user.settings.likesPerHour) &&
+      (!user.settings.followsEnabled || follows >= user.settings.followsPerHour) &&
+      (!user.settings.commentsEnabled || comments >= user.settings.commentsPerHour) &&
+      (!user.settings.unfollowsEnabled || unfollows > user.settings.unfollowsPerDay || followElapsedTime < timeToFollow)) {
       Meteor.call('browserProcessing', userId, false)
       return false
     }
@@ -153,30 +169,6 @@ Meteor.methods({
     // Launch a browser
     Meteor.call('logSaveUser', {message: '--- Running insta main loop', author: userId})
     const endpoint = Meteor.call('launchBrowser', userId)
-
-    // Go to user's page
-    const browserHandle = await puppeteer.connect({browserWSEndpoint: endpoint})
-    const pages = await browserHandle.pages()
-    const page = pages[0]
-
-    // Go to the user's page
-    let url = "https://instagram.com/" + user.instaCredentials.username + "/"
-    try{
-      await page.goto(url)
-    }catch(e){
-      console.log("Timeout: "+url+" time: "+new Date())
-      Meteor.call('closeBrowsers', userId)
-      Meteor.call('browserProcessing', userId, false)
-      return false
-    }
-
-    // Check the user is logged in and log in if not
-    const loginStatus = await Meteor.call('instaCheckLoginStatus', userId, endpoint)
-    if(!loginStatus) {
-      Meteor.call('closeBrowsers', userId)
-      Meteor.call('browserProcessing', userId, false)
-      return false
-    }
 
     // Get my stats routine
     const statsMy = instaStats.findOne({author: userId, createdAt: {$gte: thisHour}})
@@ -193,8 +185,24 @@ Meteor.methods({
       let unfollow = Meteor.call('instaUnfollow', userId, endpoint)
     }
 
+    // Fix: added like rate to try to avoid Action Blocked message
+    // Check whether we are over like rate threshold
+    const like = Likes.findOne({author: userId}, {sort: {createdAt: -1}})
+    if(like) {
+      const currentTime = new Date()
+      const likeElapsedTime = currentTime - like.createdAt
+      // Less than a followRate since the last follow
+      if(likeElapsedTime < user.settings.likeRate * 1000) {
+        Meteor.call('closeBrowsers', userId)
+        Meteor.call('browserProcessing', userId, false)
+        return false
+      }
+    }
+
     // Check if all other actions are disabled or over the limit
-    if((!user.settings.likesEnabled || likes >= user.settings.likesPerHour) && (!user.settings.followsEnabled || follows >= user.settings.followsPerHour) && (!user.settings.commentsEnabled || comments >= user.settings.commentsPerHour)) {
+    if((!user.settings.likesEnabled || likes >= user.settings.likesPerHour) &&
+      (!user.settings.followsEnabled || follows >= user.settings.followsPerHour) &&
+      (!user.settings.commentsEnabled || comments >= user.settings.commentsPerHour)) {
       Meteor.call('closeBrowsers', userId)
       Meteor.call('browserProcessing', userId, false)
       return false
@@ -218,7 +226,13 @@ Meteor.methods({
     // Check if within limits
     // Fix - do not interact with your own account!
     // 14/08/2018 added minimum stats limit
-    if(!stats || stats.followers <= user.settings.minFollowers || stats.followers >= user.settings.maxFollowers || stats.following <= user.settings.minFollowing || stats.following >= user.settings.maxFollowing || stats.posts < user.settings.minPosts || stats.username === user.instaCredentials.username) {
+    if(!stats || stats.followers <= user.settings.minFollowers ||
+      stats.followers >= user.settings.maxFollowers ||
+      stats.following <= user.settings.minFollowing ||
+      stats.following >= user.settings.maxFollowing ||
+      stats.posts < user.settings.minPosts ||
+      stats.username === user.instaCredentials.username
+    ) {
       Meteor.call('logSaveUser', {message: 'User is FILTERED. posts: ' + stats.posts + ', followers: ' + stats.followers + ', following: ' + stats.following + ', url: ' + stats.url, author: userId})
       Meteor.call('closeBrowsers', userId)
       Meteor.call('browserProcessing', userId, false)
@@ -253,14 +267,19 @@ Meteor.methods({
   async launchBrowser(userId) {
     const browser = Browsers.findOne({author: userId})
     const user = Meteor.users.findOne(userId, {fields: {settings: 1}})
+    let configArgs = ['--no-sandbox', '--disable-setuid-sandbox']
+
+    if (user.settings.proxyEnabled) {
+      configArgs.push('--proxy-server=' + Meteor.settings.private.instagram.proxyHost + ':' + Meteor.settings.private.instagram.proxyPort)
+    }
+
     const config = {
       headless: !user.settings.browserShow,
       // Possible fix of chromium not running in docker linux. However, it could potentially affect overall safety.
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-      // slowMo: 100,
+      args: configArgs,
       defaultView: {
-        width: 1440,
-        height: 2560,
+        width: 1125,
+        height: 2436,
         isMobile: true,
         hasTouch: true,
       }
@@ -272,6 +291,16 @@ Meteor.methods({
       const pages = await browserNew.pages()
       const page = pages[0]
 
+      if (user.settings.proxyEnabled) {
+        const proxyUsername = Meteor.settings.private.instagram.proxyUsername
+        const proxyPassword = Meteor.settings.private.instagram.proxyPassword
+        await page.authenticate({username: proxyUsername, password: proxyPassword})
+      }
+
+      // Set user agent to iOS v12
+      const userAgent = 'Mozilla/5.0 (iPhone; CPU iPhone OS 12_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/16B5089b'
+      await page.setUserAgent(userAgent)
+
       // Navigation timeout of 10s
       await page.setDefaultNavigationTimeout(10000)
 
@@ -279,7 +308,7 @@ Meteor.methods({
       if(!user.settings.imagesShow) {
         await page.setRequestInterception(true)
         page.on('request', request => {
-          if(request.url().endsWith('.png') || request.url().endsWith('.jpg') || request.url().endsWith('.gif')) {
+          if(request.resourceType() === 'image' || request.resourceType() === "media" || request.resourceType() === "stylesheet") {
             request.abort()
           }else{
             request.continue()
@@ -338,15 +367,15 @@ Meteor.methods({
     const pages = await browserHandle.pages()
     const page = await pages[0]
 
-    const url = "https://instagram.com/accounts/login/"
-    try{
-      await page.goto(url)
-    }catch (e) {
-      console.log("Timeout: "+url+" time: "+new Date())
-      return false
-    }
-
-    await sleepLong()
+    // const url = "https://instagram.com/accounts/login/"
+    // try{
+    //   await page.goto(url)
+    // }catch (e) {
+    //   console.log("Timeout: "+url+" time: "+new Date())
+    //   return false
+    // }
+    //
+    // await sleepLong()
 
     // Check if username input filed is present
     let query = "//input[@name='username']"
@@ -425,17 +454,30 @@ Meteor.methods({
   async instaCheckLoginStatus(userId, endpoint) {
     const browserHandle = await puppeteer.connect({browserWSEndpoint: endpoint})
     const pages = await browserHandle.pages()
-    const page = await pages[0]
+    const page = pages[0]
+
+    // Go to the user's page
+    let url = "https://www.instagram.com/accounts/login/"
+    try{
+      await page.goto(url)
+    }catch(e){
+      console.log("Timeout: "+url+" time: "+new Date())
+      return false
+    }
 
     Meteor.call('logSaveUser', {message: '--- Running check log in status', author: userId})
 
-    await sleepMedium()
+    await sleepLong()
 
     // Check if login button is present
-    let query = "//button[text()='Log In']"
-    const loginButton = await page.$x(query)
-    if(loginButton.length > 0) {
+    let query = "//input[@name='username']"
+    const usernameInput = await page.$x(query)
+
+    await sleepLong()
+
+    if(usernameInput.length > 0) {
       const login = await Meteor.call('instaLogin', userId, endpoint)
+
       if(!login) {
         return false
       }else{
@@ -565,6 +607,11 @@ Meteor.methods({
     const page = pages[0]
 
     const like = Likes.findOne({userName: username})
+
+    if (!like) {
+      return 'newUserNameIsNotAvailable'
+    }
+
     let url = like.url
 
     try{
@@ -575,8 +622,15 @@ Meteor.methods({
     }
     Meteor.call('logSaveUser', {message: 'Loading page: ' + url, author: userId})
 
+    // Check is user also deleted the photo/video
+    let query = "//a[text()='Go back to Instagram.']"
+    const pageRemoved = await page.$x(query)
+    if(pageRemoved.length > 0) {
+      return 'newUserNameIsNotAvailable'
+    }
+
     // Get new username
-    let query = "//a[contains(@class, 'FPmhX') and contains(@class, 'nJAzx')]"
+    query = "//a[contains(@class, 'FPmhX') and contains(@class, 'nJAzx')]"
     const userNameHandle = await page.$x(query)
     if(userNameHandle.length == 0) {
       return false
@@ -600,28 +654,19 @@ Meteor.methods({
     const pages = await browserHandle.pages()
     const page = pages[0]
 
-    // Get like button
-    // 03/07/2018 fix applied
-    let query = "//button[contains(@class, 'coreSpriteHeartOpen')]"
-    const likeButton = await page.$x(query)
-    if(likeButton.length == 0) {
-      console.log("Like: Could not get like button time: " + new Date())
-      return false
-    }
-
-    // Check whether it was liked previously
-    query = "//span[@aria-label='Like']"
-    let type = await page.$x(query)
-    if(type.length == 0) {
-      console.log("Like: Could not get like state time: " + new Date())
-      return false
-    }
-
     // Get post url
     const url = await page.url()
 
+    // // Check whether it was liked previously
+    // let query = "//span[@aria-label='Like']"
+    // let type = await page.$x(query)
+    // if(type.length == 0) {
+    //   console.log("Like: Could not get like state time: " + new Date())
+    //   return false
+    // }
+
     // Get media url
-    query = "//div[contains(@class, 'eLAPa')]//img[contains(@class, 'FFVAD')]"
+    let query = "//div[contains(@class, 'eLAPa')]//img[contains(@class, 'FFVAD')]"
     let img = await page.$x(query)
     if(img.length == 0) {
       console.log("Like: Could not get like image: " + new Date())
@@ -639,24 +684,41 @@ Meteor.methods({
     }
 
     // Click for a like
-    await likeButton[0].click()
-
-    // Check whether like was actually recorded
-    try{
-      await page.goto(url)
-    }catch (e) {
-      console.log("Timeout: " + url + " time: " + new Date())
+    // Get like button
+    // 03/07/2018 fix applied
+    query = "//button[contains(@class, 'coreSpriteHeartOpen')]"
+    const likeButton = await page.$x(query)
+    if(likeButton.length === 0) {
+      console.log("Like: Could not get like button time: " + new Date())
       return false
     }
 
-    query = "//span[@aria-label='Unlike']"
-    type = await page.$x(query)
-    if(type.length == 0) {
-      console.log("Like: was not actually applied image: " + new Date())
-      return false
-    }
+    await sleepLong()
+
+    // await page.screenshot({path: '/home/screenshot.png', fullPage: true})
+
+    await likeButton[0].click({delay: 255})
+
+    // // Check whether like was actually recorded
+    // try{
+    //   await page.goto(url)
+    // }catch (e) {
+    //   console.log("Timeout: " + url + " time: " + new Date())
+    //   return false
+    // }
+    //
+    // await sleepMedium()
+    //
+    // query = "//span[@aria-label='Unlike']"
+    // type = await page.$x(query)
+    // if(type.length == 0) {
+    //   console.log("Like: was not actually applied image: " + new Date())
+    //   return false
+    // }
 
     Meteor.call('likeSave', {url: url, photo: photo._remoteObject.value, userName: userName, userUrl: userUrl, author: userId, tag: tag})
+
+    await sleepLong()
 
     return true
   },
@@ -757,8 +819,11 @@ Meteor.methods({
       // 25/10/2018 Username change fix
       Meteor.call('logSaveUser', {message: 'User changed the username', author: userId})
       let username = Meteor.call('instaGetNewUsername', userId, endpoint, follow.userName)
-      if(!username) {
-        // Meteor.call('follow.unfollowRemoved', follow._id)
+      if(username === 'newUserNameIsNotAvailable') {
+        Meteor.call('follow.unfollow', follow._id)
+        return true
+      }
+      else if (!username) {
         return false
       }
 
