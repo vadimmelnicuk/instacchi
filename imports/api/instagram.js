@@ -354,6 +354,14 @@ Meteor.methods({
         const browserExists = await Meteor.call('connectToBrowser', browser.endpoint)
         if(browserExists) {
           const browserHandle = await puppeteer.connect({browserWSEndpoint: browser.endpoint})
+
+          // Close all pages belonging to the browser
+          const pages = await browserHandle.pages()
+          pages.forEach(async function(page) {
+            await page.close()
+          })
+
+          // Close the actual browser
           await browserHandle.close()
         }
       })
@@ -680,7 +688,12 @@ Meteor.methods({
       // In case it is a video
       query = "//div[contains(@class, 'OAXCp')]//img[contains(@class, '_8jZFn')]"
       img = await page.$x(query)
-      photo = await img[0].getProperty('src')
+      // Fix 20/12/2018 sometimes img is not defined
+      if(img.length > 0) {
+        photo = await img[0].getProperty('src')
+      }else {
+        return false
+      }
     }
 
     // Click for a like
