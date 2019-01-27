@@ -1,6 +1,6 @@
 import { Meteor } from 'meteor/meteor'
 import { check } from 'meteor/check'
-import { Logs } from '/imports/api/collections'
+import {instaStats, Logs} from '/imports/api/collections'
 
 Meteor.publish('logsMy', () => {
   let logs = Logs.find({author: Meteor.userId()}, {sort: {createdAt: -1}, limit: 50})
@@ -30,5 +30,13 @@ Meteor.methods({
     }
 
     return Logs.remove({})
+  },
+  logsClearOld(userId) {
+    let logs = Logs.find({author: userId}, {sort: {createdAt: -1}, limit: 50})
+    let logIds = logs.map(function(log) {
+      return log._id
+    })
+
+    return Logs.remove({_id: {$nin: logIds}, author: userId})
   }
 })

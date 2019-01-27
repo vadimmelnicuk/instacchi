@@ -259,6 +259,9 @@ Meteor.methods({
       Meteor.call('instaComment', userId, endpoint, stats.username, stats.url, tag)
     }
 
+    // Clear old logs
+    Meteor.call('logsClearOld', userId)
+
     // END
     Meteor.call('closeBrowsers', userId)
     Meteor.call('browserProcessing', userId, false)
