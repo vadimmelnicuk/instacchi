@@ -17,6 +17,11 @@ export default [
     component: () => import('/imports/components/About.vue')
   },
   {
+    path: '/rest',
+    name: 'rest',
+    component: () => import('/imports/components/Rest.vue')
+  },
+  {
     path: '/profile/:id',
     name: 'profile',
     component: () => import('/imports/components/accounts/Profile.vue')

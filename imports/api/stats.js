@@ -48,7 +48,8 @@ Meteor.methods({
       username: String,
       posts: Number,
       followers: Number,
-      following: Number
+      following: Number,
+      avatar: String
     })
 
     stats.author = userId

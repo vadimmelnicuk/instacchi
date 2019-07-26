@@ -1,11 +1,35 @@
 <template>
-  <div>
+  <div class="rest">
     <div v-if="$subReady.statsLatest && statsLatest" class="stats stats-my">
+      <div class="stat avatar">
+        <a v-bind:href="statsLatest.avatar" target="_blank"><img v-bind:src="statsLatest.avatar"></a>
+      </div>
       <div class="stat">
         Updated {{statsLatest.createdAt | fromNow}}
         <div class="number">
           <a v-bind:href="'https://www.instagram.com/'+statsLatest.username+'/'" target="_blank">{{statsLatest.username}}</a>
         </div>
+      </div>
+      <div class="stat">
+        Posts
+        <div class="number">
+          {{statsLatest.posts}}
+        </div>
+      </div>
+      <div class="stat">
+        Followers
+        <div class="number">
+          {{statsLatest.followers}}
+        </div>
+      </div>
+      <div class="stat">
+        Following
+        <div class="number">
+          {{statsLatest.following}}
+        </div>
+      </div>
+      <div class="stat">
+        <button v-on:click="toggleShowChangeInfo()" class="btn small">Details</button>
         <div v-if="showChangeInfo" class="change-info">
           <div class="controls">
             <button v-on:click="showStatsThreeDays()" class="btn small">Last 3 days</button>
@@ -48,27 +72,6 @@
             </tr>
           </table>
         </div>
-      </div>
-      <div class="stat">
-        Posts
-        <div class="number">
-          {{statsLatest.posts}}
-        </div>
-      </div>
-      <div class="stat">
-        Followers
-        <div class="number">
-          {{statsLatest.followers}}
-        </div>
-      </div>
-      <div class="stat">
-        Following
-        <div class="number">
-          {{statsLatest.following}}
-        </div>
-      </div>
-      <div class="stat">
-        <button v-on:click="toggleShowChangeInfo()" class="btn small">Details</button>
       </div>
     </div>
 
@@ -144,34 +147,31 @@
     <table class="dashboard">
       <tr>
         <td>
-          <b>Browser</b>
-          <div class="browser" v-if="$subReady.browserMy && browser">
-            <span>{{browser.createdAt | readableDate}}</span>
-            <a v-bind:title="browser.endpoint">socket</a>
-            <span v-if="browser.running" class="label green">running</span>
+          <b>Session</b>
+          <div class="session" v-if="$subReady.sessionMy && session">
+            <span>{{session.createdAt | readableDate}}</span>
+            <span v-if="session.running" class="label green">running</span>
             <span v-else class="label red">stopped</span>
-            <span v-if="browser.processing" class="label green">processing</span>
+            <span v-if="session.processing" class="label green">processing</span>
             <span v-else class="label grey">paused</span>
-            <div v-if="browser.verify" class="code">
+            <div v-if="session.verify" class="code">
               <form v-on:submit.prevent="saveCode()">
                 <input type="text" name="code" placeholder="Code">
                 <input type="submit" value="Save" class="btn">
               </form>
             </div>
           </div>
-          <div v-else class="browser">
+          <div v-else class="session">
             None
           </div>
         </td>
         <td>
           <b>Controls</b>
           <div class="controls">
-            <button v-if="browser && browser.running" v-on:click="instaStop()" class="btn small">Stop</button>
-            <button v-else v-on:click="instaRun()" class="btn small">Run</button>
-            <button v-if="browser.running" v-on:click="closeMyBrowser()" class="btn small">Close my browser</button>
-            <button v-else v-on:click="launchBrowser()" class="btn small">Launch browser</button>
-            <button v-on:click="clearLogs()" class="btn small" v-if="isDevelopment">Clear logs</button>
-            <button v-on:click="clearLikes()" class="btn small" v-if="isDevelopment">Clear likes</button>
+            <button v-if="session && session.running" v-on:click="instaStop()" class="btn small">Stop</button>
+            <button v-else class="btn small" v-on:click="instaRun()">Run</button>
+            <button class="btn small" v-on:click="sessionAdd()">Start session</button>
+            <button class="btn small" v-on:click="sessionRemoveMy()">Remove session</button>
           </div>
         </td>
       </tr>
@@ -241,7 +241,7 @@
   import { Meteor } from 'meteor/meteor'
   import { Session } from 'meteor/session'
 
-  import { Browsers, Logs, Likes, Follows, Comments, instaStats } from '/imports/api/collections'
+  import { Sessions, Logs, Likes, Follows, Comments, instaStats } from '/imports/api/collections'
 
   // Time session
   Session.set("time", new Date())
@@ -250,10 +250,9 @@
   }, 60000)
 
   export default {
-    name: 'dashboard',
+    name: 'rest',
     data () {
       return {
-        isDevelopment: Meteor.isDevelopment,
         showChangeInfo: false,
         showStatsType: 1
       }
@@ -261,10 +260,10 @@
     mounted () {
       this.$subscribe('profileMy', [])
       this.$subscribe('profileInstaStatsMy', [])
+      this.$subscribe('sessionMy', [])
       this.$subscribe('statsLatest', [])
       this.$subscribe('statsHistory', [3])
       this.$subscribe('statsMonth', [])
-      this.$subscribe('browserMy', [])
       this.$subscribe('logsMy', [])
       this.$subscribe('followsMy', [])
       this.$subscribe('likesToday', [])
@@ -279,6 +278,10 @@
     meteor: {
       profile() {
         return Meteor.users.findOne(Meteor.userId())
+      },
+      session () {
+        let session = Sessions.findOne({author: Meteor.userId()})
+        return session ? session : false
       },
       statsLatest() {
         return instaStats.findOne({author: Meteor.userId()}, {sort: {createdAt: -1}})
@@ -333,10 +336,6 @@
         })
 
         return stats
-      },
-      browser() {
-        let browser = Browsers.findOne({author: Meteor.userId()})
-        return browser ? browser : false
       },
       logs() {
         return Logs.find({author: Meteor.userId()}, {sort: {createdAt: -1}})
@@ -393,9 +392,8 @@
       }
     },
     methods: {
-      instaRun() {
-        let self = this
-        Meteor.call('runLoop', function (e, r) {
+      instaRun () {
+        Meteor.call('runInstaRest', function (e, r) {
           if(e) {
             self.toast(e.reason)
           }
@@ -403,57 +401,25 @@
       },
       instaStop() {
         let self = this
-        Meteor.call('stopLoop', function (e, r) {
+        Meteor.call('stopInstaRest', function (e, r) {
           if(e) {
             self.toast(e.reason)
           }
         })
       },
-      launchBrowser() {
+      sessionAdd () {
         let self = this
-        Meteor.call('browserAdd', function (e, r) {
+        Meteor.call('sessionAdd', function (e, r) {
           if(e) {
             self.toast(e.reason)
           }
         })
       },
-      closeMyBrowser() {
+      sessionRemoveMy () {
         let self = this
-        Meteor.call('browserRemoveMy', function (e, r) {
+        Meteor.call('sessionRemoveMy', function (e, r) {
           if(e) {
             self.toast(e.reason)
-          } else {
-            self.toast('Your browser was closed')
-          }
-        })
-      },
-      clearLogs() {
-        let self = this
-        Meteor.call('logsClear', function (e, r) {
-          if(e) {
-            self.toast(e.reason)
-          } else {
-            self.toast('Logs were cleared')
-          }
-        })
-      },
-      clearLikes() {
-        let self = this
-        Meteor.call('likesClear', function (e, r) {
-          if(e) {
-            self.toast(e.reason)
-          } else {
-            self.toast('Likes were cleared')
-          }
-        })
-      },
-      saveCode(event) {
-        let self = this
-        Meteor.call('browserSaveCode', event.target.code.value, (e, r) => {
-          if(e) {
-            self.toast(e.reason)
-          } else {
-            self.toast('The code was saved')
           }
         })
       },
@@ -485,15 +451,20 @@
 
   .stats-my {border-bottom: 1px solid gainsboro;}
   .stats-my .stat {display: inline-block; margin-right: 25px; margin-bottom: 20px;}
+  .stats-my .avatar {margin-right: 10px;}
+  .stats-my .avatar img {width: 40px; height: 40px;}
   .stats-my .controls {margin-bottom: 5px;}
-  .change-info {position: absolute; z-index: 1; margin-top: 10px; padding: 10px; font-size: 0.85rem; color: black; border: 1px solid gainsboro; background: white;}
-  .change-info .change-info-stats th {text-align: left;}
-  .change-info .change-info-stats td {padding-right: 25px;}
-  .change-info .change-info-stats .change-info-stat {display: inline-block; min-width: 35px;}
+
   .dashboard {width: 100%; min-height: 85px; padding: 5px; border: 1px solid gainsboro;}
   .dashboard td {width: 50%; vertical-align: top;}
   .dashboard .browser .code {margin-top: 10px;}
   .dashboard .controls button {margin-bottom: 5px;}
+
+  .change-info {position: absolute; z-index: 1; margin-top: 10px; padding: 10px; font-size: 0.85rem; color: black; border: 1px solid gainsboro; background: white;}
+  .change-info .change-info-stats th {text-align: left;}
+  .change-info .change-info-stats td {padding-right: 25px;}
+  .change-info .change-info-stats .change-info-stat {display: inline-block; min-width: 35px;}
+
   .activity {width: 100%; margin: 10px 0; font-size: 1rem;}
   .activity td {width: 33%; vertical-align: top; padding-right: 10px; font-size: 0.85rem;}
   .activity .title {margin-bottom: 5px; font-size: 1rem; font-weight: bold;}
@@ -503,5 +474,6 @@
   .follows .follow {margin-bottom: 3px; color: dimgrey;}
   .unfollows .unfollow {margin-bottom: 3px; color: dimgrey;}
   .comments .comment {margin-bottom: 3px; color: dimgrey;}
+
   .logs {max-height: 300px; height: 300px; margin: 10px 0; padding: 5px; font-size: 0.85rem; overflow-y: scroll; border: 1px solid gainsboro;}
 </style>

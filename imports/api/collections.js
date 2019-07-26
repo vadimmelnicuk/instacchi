@@ -1,5 +1,6 @@
 import { Mongo } from 'meteor/mongo'
 
+export const Sessions = new Mongo.Collection('sessions')
 export const Browsers = new Mongo.Collection('browsers')
 export const Logs = new Mongo.Collection('logs')
 export const Likes = new Mongo.Collection('likes')

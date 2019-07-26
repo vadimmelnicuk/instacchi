@@ -8,6 +8,7 @@
     "@babel/runtime": "^7.4.4",
     "aes256": "^1.0.4",
     "bcrypt": "^2.0.1",
+    "instagram-private-api": "^1.14.0",
     "meteor-node-stubs": "^0.4.1",
     "moment": "^2.24.0",
     "puppeteer": "^1.16.0",
