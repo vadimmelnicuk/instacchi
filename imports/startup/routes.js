@@ -6,11 +6,11 @@ export default [
     name: 'home',
     component: () => import('/imports/components/Home.vue')
   },
-  {
-    path: '/dashboard',
-    name: 'dashboard',
-    component: () => import('/imports/components/Dashboard.vue')
-  },
+  // {
+  //   path: '/dashboard',
+  //   name: 'dashboard',
+  //   component: () => import('/imports/components/Dashboard.vue')
+  // },
   {
     path: '/about',
     name: 'about',

@@ -810,7 +810,7 @@ async function instaFollow(userId, endpoint, userName, userUrl, tag) {
   // Get follow button
   query = "//button[text()='Follow']"
   const followButton = await page.$x(query)
-  if(followButton.length == 0) {
+  if(followButton.length === 0) {
     return false
   }
   await sleepShort()

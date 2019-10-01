@@ -25,6 +25,7 @@ Meteor.methods({
       message: String,
       url: String,
       author: String,
+      userId: Number,
       userName: String,
       userUrl: String,
       tag: String

@@ -35,6 +35,7 @@ Meteor.publish('unfollowsToday', () => {
 Meteor.methods({
   'follow.save'(follow) {
     check(follow.author, String)
+    check(follow.userId, Number)
     check(follow.userName, String)
     check(follow.userUrl, String)
     check(follow.tag, String)

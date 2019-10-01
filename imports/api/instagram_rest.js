@@ -142,10 +142,10 @@ async function instaRestLoop(userId) {
 
     await sleepShort()
 
-    // // Unfollow routine
-    // if(user.settings.unfollowsEnabled && unfollows < user.settings.unfollowsPerDay) {
-    //   let unfollow = await instaUnfollow(userId)
-    // }
+    // Unfollow routine
+    if(user.settings.unfollowsEnabled && unfollows < user.settings.unfollowsPerDay) {
+      let unfollowHandle = await instaUnfollow(userId)
+    }
 
     // Fix: added like rate to try to avoid Action Blocked message
     // Check whether we are over like rate threshold
@@ -153,8 +153,8 @@ async function instaRestLoop(userId) {
     if(like) {
       const currentTime = new Date()
       const likeElapsedTime = currentTime - like.createdAt
-      // Less than a likeRate since the last like
 
+      // Less than a likeRate since the last like
       if(likeElapsedTime < user.settings.likeRate * 1000) {
         Meteor.call('sessionSetProcessing', userId, false)
         return false
@@ -203,13 +203,30 @@ async function instaRestLoop(userId) {
     }
 
     // Like routine
+    let likeHandle = false
     if(user.settings.likesEnabled && likes < user.settings.likesPerHour) {
-      const like = await instaLike(userId, stats.username, tag)
-      if(!like) {
+      likeHandle = await instaLike(userId, stats.username, tag)
+      if(!likeHandle) {
         Meteor.call('sessionSetProcessing', userId, false)
         return false
       }
     }
+
+    await sleepMedium()
+
+    // Follow routine
+    if(user.settings.followsEnabled && follows < user.settings.followsPerHour && likeHandle) {
+      const followHandle = await instaFollow(userId, stats.username, stats.url, tag)
+    }
+
+    await sleepMedium()
+
+    // Comment routine
+    if(user.settings.commentsEnabled && comments < user.settings.commentsPerHour && likeHandle) {
+      const commentHandle = await instaComment(userId, stats.username, likeHandle, tag)
+    }
+
+    await sleepLong()
   }
 
   Meteor.call('sessionSetProcessing', userId, false)
@@ -223,26 +240,25 @@ async function instaLogin(userId) {
 
   if (Number.isInteger(timerIndex)) {
     if (session.cookies === '') {
+      if (user.settings.proxyEnabled) {
+        timers[timerIndex].ig.state.proxyUrl = 'http://' +
+          Meteor.settings.private.instagram.proxyUsername + ':'+
+          Meteor.settings.private.instagram.proxyPassword + '@' +
+          Meteor.settings.private.instagram.proxyHost + ':' +
+          Meteor.settings.private.instagram.proxyPort
+      }
       const cipher = aes256.createCipher(Meteor.settings.private.instagram.secret)
       timers[timerIndex].ig.state.generateDevice(user.instaCredentials.username)
       await timers[timerIndex].ig.simulate.preLoginFlow()
-
-      // timers[timerIndex].ig.request.end$.subscribe(async () => {
-      //   const cookies = await timers[timerIndex].ig.state.serializeCookieJar()
-      //   Meteor.call('sessionSetCookies', JSON.stringify(cookies))
-      // })
-
       const loggedInUser = await timers[timerIndex].ig.account.login(user.instaCredentials.username, cipher.decrypt(user.instaCredentials.password))
-
       process.nextTick(async () => await timers[timerIndex].ig.simulate.postLoginFlow())
-
       const cookies = await timers[timerIndex].ig.state.serializeCookieJar()
-
       Meteor.call('sessionSetCookies', userId, JSON.stringify(cookies))
-      // const userFeed = timers[timerIndex].ig.feed.user(loggedInUser.pk)
     } else {
       await timers[timerIndex].ig.state.deserializeCookieJar(session.cookies)
     }
+
+    // const currentUser = await timers[timerIndex].ig.account.currentUser()
 
     return true
   }
@@ -252,8 +268,12 @@ async function instaLogin(userId) {
 
 async function instaGetUserInfo(userId, username) {
   const timerIndex = await getTimerIndex(userId)
-  const id = await timers[timerIndex].ig.user.getIdByUsername(username)
-  const info = await timers[timerIndex].ig.user.info(id)
+  const id = await timers[timerIndex].ig.user.getIdByUsername(username).catch((error) => {
+    console.log(error)
+  })
+  const info = await timers[timerIndex].ig.user.info(id).catch((error) => {
+    console.log(error)
+  })
 
   return info
 }
@@ -288,11 +308,14 @@ async function instaPickFromTag(userId, tag) {
   })
 
   const timerIndex = await getTimerIndex(userId)
+  // catch is not supported
   const tagFeed = await timers[timerIndex].ig.feed.tag(tag)
   let items = []
 
   for (let i = 0; i < 3; i++) {
-    let page = await tagFeed.items()
+    let page = await tagFeed.items().catch((error) => {
+      console.log(error)
+    })
     Array.prototype.push.apply(items, page)
     await sleepShort()
   }
@@ -330,17 +353,70 @@ async function instaUnfollow(userId) {
   }
 
   Meteor.call('logSaveUser', {
-    message: 'Running insta unfollow',
+    message: 'Running insta unfollow for @' + follow.userName,
     author: userId
   })
 
+  // TODO - use saved user ID instead
   const timerIndex = await getTimerIndex(userId)
-  const id = await timers[timerIndex].ig.user.getIdByUsername('justinbieber')
-  const friendship = await timers[timerIndex].ig.friendship.show(id)
+  const id = await timers[timerIndex].ig.user.getIdByUsername(follow.userName).catch((error) => {
+    Meteor.call('logSaveUser', {
+      message: 'Failed to get id of @' + follow.userName,
+      author: userId
+    })
+  })
 
-  console.log(friendship)
+  if(id) {
+    const friendship = await timers[timerIndex].ig.friendship.destroy(id).catch((error) => {
+      console.log(error)
+    })
+  }
 
-  // TODO - to finish unfollow sequence
+  Meteor.call('follow.unfollow', follow._id)
+
+  return true
+}
+
+async function instaFollow(userId, username, url, tag) {
+  //Only follow once
+  const follows = Follows.find({author: userId, userName: username}).fetch()
+  if(follows.length > 0) {
+    return false
+  }
+
+  // Check whether we are over follow rate threshold
+  const user = Meteor.users.findOne(userId, {fields: {settings: 1}})
+  const follow = Follows.findOne({author: userId, following: true}, {sort: {createdAt: -1}})
+  if(follow) {
+    const currentTime = new Date()
+    const elapsedTime = currentTime - follow.createdAt
+    // Less than a followRate since the last follow
+    if(elapsedTime < user.settings.followRate * 1000) {
+      return false
+    }
+  }
+
+  Meteor.call('logSaveUser', {
+    message: 'Running insta follow for @' + username,
+    author: userId
+  })
+
+  // Follow request
+  const timerIndex = await getTimerIndex(userId)
+  const id = await timers[timerIndex].ig.user.getIdByUsername(username).catch((error) => {
+    console.log(error)
+  })
+  const friendship = await timers[timerIndex].ig.friendship.create(id).catch((error) => {
+    console.log(error)
+  })
+
+  Meteor.call('follow.save', {
+    author: userId,
+    userId: id,
+    userName: username,
+    userUrl: 'https://www.instagram.com/' + username,
+    tag: tag
+  })
 
   return true
 }
@@ -352,43 +428,111 @@ async function instaLike(userId, username, tag) {
   })
 
   const timerIndex = await getTimerIndex(userId)
-  const id = await timers[timerIndex].ig.user.getIdByUsername(username)
+  const id = await timers[timerIndex].ig.user.getIdByUsername(username).catch((error) => {
+    console.log(error)
+  })
+  // catch is not supported
   const userFeed = await timers[timerIndex].ig.feed.user(id)
-  const items = await userFeed.items()
+  const items = await userFeed.items().catch((error) => {
+    console.log(error)
+  })
 
   if(items.length > 0 && !items[0].has_liked) {
     // Get photo url
     let thumbnail = ''
+
     if(items[0].image_versions2) {
-      thumbnail = items[0].image_versions2.candidates.filter(function(p) {
-        return p.width === 150
-      })
+      thumbnail = items[0].image_versions2.candidates.slice(-1)[0]
     }else if(items[0].carousel_media) {
-      thumbnail = items[0].carousel_media[0].image_versions2.candidates.filter(function(p) {
-        return p.width === 150
-      })
+      thumbnail = items[0].carousel_media[0].image_versions2.candidates.slice(-1)[0]
     }
 
     if(thumbnail !== '') {
-      thumbnail = thumbnail[0].url
+      thumbnail = thumbnail.url
+    }else{
+      console.log('thumbnail')
+      return false
     }
 
-    const like = await timers[timerIndex].ig.media.like({mediaId: items[0].id, moduleInfo: {module_name: 'profile'}, d: 0})
+    const like = await timers[timerIndex].ig.media.like({mediaId: items[0].id, moduleInfo: {module_name: 'profile'}, d: 0}).catch((error) => {
+      Meteor.call('logSaveUser', {
+        message: 'Failed to like @' + username,
+        author: userId
+      })
+
+      console.log(error)
+    })
 
     if(like && like.status === 'ok') {
       Meteor.call('likeSave', {
         url: 'https://www.instagram.com/p/' + items[0].code,
         photo: thumbnail,
         userName: username,
+        userId: id,
         userUrl: 'https://www.instagram.com/' + username,
         author: userId,
         tag: tag
       })
     }else{
+      console.log('like')
       return false
     }
   }else{
     return false
+  }
+
+  return items[0].id
+}
+
+async function instaComment(userId, username, mediaId, tag) {
+  //Only comment once
+  const comments = Comments.find({author: userId, userName: username}).fetch()
+  if(comments.length > 0) {
+    return false
+  }
+
+  // Check whether we are over comment rate threshold
+  const user = Meteor.users.findOne(userId, {fields: {settings: 1}})
+  const commentLast = Comments.findOne({author: userId}, {sort: {createdAt: -1}})
+  if(commentLast) {
+    const currentTime = new Date()
+    const elapsedTime = currentTime - commentLast.createdAt
+    if(elapsedTime < user.settings.commentRate * 1000) {
+      return false
+    }
+  }
+
+  Meteor.call('logSaveUser', {
+    message: 'Running insta comment for @' + username,
+    author: userId
+  })
+
+  // Generate a comment
+  let generatedComment = ''
+  const commentSeed = user.settings.commentSeed.split('|')
+  commentSeed.forEach(function(part) {
+    let partArray = part.split(',')
+    generatedComment = generatedComment.concat(Random.choice(partArray))
+  })
+
+  const timerIndex = await getTimerIndex(userId)
+  const id = await timers[timerIndex].ig.user.getIdByUsername(username).catch((error) => {
+    console.log(error)
+  })
+  const comment = await timers[timerIndex].ig.media.comment({mediaId: mediaId, text: generatedComment}).catch((error) => {
+    console.log(error)
+  })
+
+  if(comment.status === 'Active') {
+    Meteor.call('comment.save', {
+      message: generatedComment,
+      url: mediaId,
+      author: userId,
+      userId: id,
+      userName: username,
+      userUrl: 'https://www.instagram.com/' + username,
+      tag: tag
+    })
   }
 
   return true
