@@ -24,7 +24,7 @@ Meteor.methods({
     check(like.url, String)
     check(like.photo, String)
     check(like.author, String)
-    check(like.userId, Number)
+    check(like.userId, String)
     check(like.userName, String)
     check(like.userUrl, String)
     check(like.tag, String)

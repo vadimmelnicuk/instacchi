@@ -14,5 +14,5 @@ import '/imports/api/comments'
 import '/imports/api/stats'
 
 // Methods
-// import '/imports/api/instagram'
+import '/imports/api/instagram'
 import '/imports/api/instagram_rest'

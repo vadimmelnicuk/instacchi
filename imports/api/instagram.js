@@ -118,10 +118,11 @@ Meteor.methods({
 
 async function mainLoop(userId) {
   const browser = Browsers.findOne({author: userId})
-  if(browser.processing) {
+
+  if(browser && browser.processing) {
     return false
   }
-  if(browser.verify && !browser.code) {
+  if(browser && browser.verify && !browser.code) {
     return false
   }
 
@@ -382,8 +383,8 @@ async function closeBrowsers(userId = false) {
   } catch (error) {
     console.log(error.message)
   } finally {
-    console.log(process)
-    process.emit('SIGTERM')
+    // console.log(process)
+    // process.emit('SIGTERM')
     // process.removeAllListeners('exit')
     // process.removeAllListeners('SIGHUP')
     // process.removeAllListeners('SIGINT')
@@ -419,6 +420,9 @@ async function instaLogin(userId, endpoint) {
     // Submit log in details
     query = "//button/div[text()='Log In']"
     const submitButton = await page.$x(query)
+
+    // console.log(submitButton)
+
     let nav = page.waitForNavigation()
     try {
       await submitButton[0].click()
@@ -620,7 +624,7 @@ async function instaGetUserStats(userId, endpoint, userName) {
   try{
     await page.goto(url)
   }catch(e){
-    console.log("Timeout: "+url+" time: "+new Date())
+    console.log("Timeout: " + url + " time: "+new Date())
     return false
   }
 
@@ -640,6 +644,18 @@ async function instaGetUserStats(userId, endpoint, userName) {
   stats.followers = await parseStat(followers._remoteObject.value)
   stats.following = await parseStat(following._remoteObject.value)
   stats.username = userName
+
+  // Get avatar
+  let avatar = ''
+  query = "//img[contains(@alt, 'Change Profile Photo')]"
+  let img = await page.$x(query)
+  let photo = ''
+  if(img.length > 0) {
+    photo = await img[0].getProperty('src')
+    stats.avatar = photo._remoteObject.value
+  } else {
+    stats.avatar = photo
+  }
 
   await page.goBack()
 
@@ -702,9 +718,11 @@ async function instaLike(userId, endpoint, userName, userUrl, tag) {
   const browserHandle = await puppeteer.connect({browserWSEndpoint: endpoint})
   const pages = await browserHandle.pages()
   const page = pages[0]
+  let likeData = {}
 
   // Get post url
   const url = await page.url()
+  likeData.url = url
 
   // // Check whether it was liked previously
   // let query = "//span[@aria-label='Like']"
@@ -722,6 +740,7 @@ async function instaLike(userId, endpoint, userName, userUrl, tag) {
   if(img.length > 0) {
     // In case it is a photo
     photo = await img[0].getProperty('src')
+    likeData.photo = photo._remoteObject.value
   }else{
     // In case it is a video
     query = "//div[contains(@class, 'OAXCp')]//img[contains(@class, '_8jZFn')]"
@@ -729,9 +748,21 @@ async function instaLike(userId, endpoint, userName, userUrl, tag) {
     // Fix 20/12/2018 sometimes img is not defined
     if(img.length > 0) {
       photo = await img[0].getProperty('src')
+      likeData.photo = photo._remoteObject.value
     }else {
       return false
     }
+  }
+
+  // Get user id
+  query = "//meta[contains(@property, 'instapp:owner_user_id')]"
+  let postUserIdHandle = await page.$x(query)
+  let postUserId = ''
+  if(postUserIdHandle.length > 0) {
+    postUserId = await postUserIdHandle[0].getProperty('content')
+    likeData.userId = postUserId._remoteObject.value
+  }else{
+    return false
   }
 
   // Click for a like
@@ -767,7 +798,12 @@ async function instaLike(userId, endpoint, userName, userUrl, tag) {
   //   return false
   // }
 
-  Meteor.call('likeSave', {url: url, photo: photo._remoteObject.value, userName: userName, userUrl: userUrl, author: userId, tag: tag})
+  likeData.author = userId
+  likeData.userName = userName
+  likeData.userUrl = userUrl
+  likeData.tag = tag
+
+  Meteor.call('likeSave', likeData)
 
   await sleepLong()
 

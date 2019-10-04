@@ -168,7 +168,7 @@
           <div class="controls">
             <button v-if="browser && browser.running" v-on:click="instaStop()" class="btn small">Stop</button>
             <button v-else v-on:click="instaRun()" class="btn small">Run</button>
-            <button v-if="browser.running" v-on:click="closeMyBrowser()" class="btn small">Close my browser</button>
+            <button v-if="browser" v-on:click="closeMyBrowser()" class="btn small">Close my browser</button>
             <button v-else v-on:click="launchBrowser()" class="btn small">Launch browser</button>
             <button v-on:click="clearLogs()" class="btn small" v-if="isDevelopment">Clear logs</button>
             <button v-on:click="clearLikes()" class="btn small" v-if="isDevelopment">Clear likes</button>
