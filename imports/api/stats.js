@@ -45,6 +45,7 @@ Meteor.methods({
     check(userId, String)
     check(stats, {
       url: String,
+      userId: String,
       username: String,
       posts: Number,
       followers: Number,

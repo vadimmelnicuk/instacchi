@@ -148,21 +148,47 @@ async function mainLoop(userId) {
   }
 
   const likes = Likes.find({author: userId, createdAt: {$gte: thisHour}}).count()
+  const like = Likes.findOne({author: userId}, {sort: {createdAt: -1}})
+  const likeRate = user.settings.likeRate * 1000
   const follows = Follows.find({author: userId, following: true, createdAt: {$gte: thisHour}}).count()
+  const latestFollow = Follows.findOne({author: userId, following: true}, {sort: {createdAt: -1}})
+  const followRate = user.settings.followRate * 1000
+  const oldestFollow = Follows.findOne({author: userId, following: true}, {sort: {createdAt: 1}})
+  const timeToFollow = 1000 * 60 * 60 * 24 * user.settings.daysToFollow
   const unfollows = Follows.find({author: userId, following: false, createdAt: {$gte: today}}).count()
   const comments = Comments.find({author: userId, createdAt: {$gte: thisHour}}).count()
-  const follow = Follows.findOne({author: userId, following: true}, {sort: {createdAt: 1}})
-  const timeToFollow = 1000 * 60 * 60 * 24 * user.settings.daysToFollow
-  let followElapsedTime = 0
-  if(follow) {
-    followElapsedTime = currentTime - follow.createdAt
+  const comment = Comments.findOne({author: userId}, {sort: {createdAt: -1}})
+  const commentRate = user.settings.commentRate * 1000
+  const statsMy = instaStats.findOne({author: userId, createdAt: {$gte: thisHour}})
+
+  // Get activities' elapsed time
+  let likeElapsedTime = 0
+  if(like) {
+    likeElapsedTime = currentTime - like.createdAt
+  }
+
+  let latestFollowElapsedTime = 0
+  if(latestFollow) {
+    latestFollowElapsedTime = currentTime - latestFollow.createdAt
+  }
+
+  let oldestFollowElapsedTime = 0
+  if(oldestFollow) {
+    oldestFollowElapsedTime = currentTime - oldestFollow.createdAt
+  }
+
+  let commentElapsedTime = 0
+  if(comment) {
+    commentElapsedTime = currentTime - comment.createdAt
   }
 
   // Fix - account for cases when some functionality is disabled
-  if((!user.settings.likesEnabled || likes >= user.settings.likesPerHour) &&
-    (!user.settings.followsEnabled || follows >= user.settings.followsPerHour) &&
-    (!user.settings.commentsEnabled || comments >= user.settings.commentsPerHour) &&
-    (!user.settings.unfollowsEnabled || unfollows > user.settings.unfollowsPerDay || followElapsedTime < timeToFollow)) {
+  if((!user.settings.likesEnabled || likes >= user.settings.likesPerHour || likeElapsedTime <= likeRate) &&
+    (!user.settings.followsEnabled || follows >= user.settings.followsPerHour || latestFollowElapsedTime <= followRate) &&
+    (!user.settings.commentsEnabled || comments >= user.settings.commentsPerHour || commentElapsedTime <= commentRate) &&
+    (!user.settings.unfollowsEnabled || unfollows > user.settings.unfollowsPerDay || oldestFollowElapsedTime <= timeToFollow) &&
+    typeof statsMy === 'object'
+  ) {
     Meteor.call('browserProcessing', userId, false)
     return false
   }
@@ -172,8 +198,7 @@ async function mainLoop(userId) {
   const endpoint = await launchBrowser(userId)
 
   // Get my stats routine
-  const statsMy = instaStats.findOne({author: userId, createdAt: {$gte: thisHour}})
-  if(!statsMy) {
+  if(typeof statsMy === 'undefined') {
     Meteor.call('logSaveUser', {message: '--- Running insta get my stats', author: userId})
     const statsHandle = await instaGetUserStats(userId, endpoint, user.instaCredentials.username)
     if(statsHandle) {
@@ -186,24 +211,11 @@ async function mainLoop(userId) {
     let unfollow = await instaUnfollow(userId, endpoint)
   }
 
-  // Fix: added like rate to try to avoid Action Blocked message
-  // Check whether we are over like rate threshold
-  const like = Likes.findOne({author: userId}, {sort: {createdAt: -1}})
-  if(like) {
-    const currentTime = new Date()
-    const likeElapsedTime = currentTime - like.createdAt
-    // Less than a followRate since the last follow
-    if(likeElapsedTime < user.settings.likeRate * 1000) {
-      await closeBrowsers(userId)
-      Meteor.call('browserProcessing', userId, false)
-      return false
-    }
-  }
-
-  // Check if all other actions are disabled or over the limit
-  if((!user.settings.likesEnabled || likes >= user.settings.likesPerHour) &&
-    (!user.settings.followsEnabled || follows >= user.settings.followsPerHour) &&
-    (!user.settings.commentsEnabled || comments >= user.settings.commentsPerHour)) {
+  // Check if all other actions are disabled or over the limit after doing starts save or unfollow
+  if((!user.settings.likesEnabled || likes >= user.settings.likesPerHour || likeElapsedTime <= likeRate) &&
+    (!user.settings.followsEnabled || follows >= user.settings.followsPerHour || latestFollowElapsedTime <= followRate) &&
+    (!user.settings.commentsEnabled || comments >= user.settings.commentsPerHour || commentElapsedTime <= commentRate)
+  ) {
     await closeBrowsers(userId)
     Meteor.call('browserProcessing', userId, false)
     return false
@@ -243,21 +255,21 @@ async function mainLoop(userId) {
   Meteor.call('logSaveUser', {message: 'User is OK. posts: ' + stats.posts + ', followers: ' + stats.followers + ', following: ' + stats.following + ', url: ' + stats.url, author: userId})
 
   // Do not perform any other routines if like was not properly recorded
-  let likeRecorded = true
+  let likeRecorded = false
 
   // Like routine
-  if(user.settings.likesEnabled && likes < user.settings.likesPerHour) {
-    likeRecorded = await instaLike(userId, endpoint, stats.username, stats.url, tag)
+  if(user.settings.likesEnabled && likes < user.settings.likesPerHour && likeElapsedTime > likeRate) {
+    likeRecorded = await instaLike(userId, endpoint, stats.userId, stats.username, stats.url, tag)
   }
 
   // Follow routine
-  if(user.settings.followsEnabled && follows < user.settings.followsPerHour && likeRecorded) {
-    await instaFollow(userId, endpoint, stats.username, stats.url, tag)
+  if(likeRecorded && user.settings.followsEnabled && follows < user.settings.followsPerHour && latestFollowElapsedTime > followRate) {
+    await instaFollow(userId, endpoint, stats.userId, stats.username, stats.url, tag)
   }
 
   // Comment routine
-  if(user.settings.commentsEnabled && comments < user.settings.commentsPerHour && likeRecorded) {
-    await instaComment(userId, endpoint, stats.username, stats.url, tag)
+  if(likeRecorded && user.settings.commentsEnabled && comments < user.settings.commentsPerHour && commentElapsedTime > commentRate) {
+    await instaComment(userId, endpoint, stats.userId, stats.username, stats.url, tag)
   }
 
   // Clear old logs
@@ -278,8 +290,8 @@ async function launchBrowser(userId) {
     '--disable-gpu',
     '--enable-logging',
     '--ignore-certificate-errors',
-    // '--no-sandbox',
-    // '--disable-setuid-sandbox',
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
     '--disable-dev-shm-usage'
   ]
 
@@ -293,7 +305,7 @@ async function launchBrowser(userId) {
     // Possible fix of chromium not running in docker linux. However, it could potentially affect overall safety.
     // ignoreHTTPSErrors: true,
     args: configArgs,
-    defaultView: {
+    defaultViewport: {
       width: 1125,
       height: 2436,
       isMobile: true,
@@ -320,6 +332,9 @@ async function launchBrowser(userId) {
     // Navigation timeout of 10s
     await page.setDefaultNavigationTimeout(10000)
 
+    // Set viewport size
+    // await page.setViewport({ width: 1125, height: 2436 })
+
     // Block image display if enabled
     if(!user.settings.imagesShow) {
       await page.setRequestInterception(true)
@@ -340,6 +355,7 @@ async function launchBrowser(userId) {
       Meteor.call('logSaveUser', {message: '--- Cookies set', author: userId})
     } else {
       Meteor.call('logSaveUser', {message: '--- No cookies were found', author: userId})
+      // const loginStatus = await instaCheckLoginStatus(userId, endpoint)
     }
 
     Meteor.call('browserSetEndpoint', browser._id, endpoint)
@@ -351,7 +367,8 @@ async function launchBrowser(userId) {
 }
 
 function requestListener(request) {
-  if(request.resourceType() === 'image' || request.resourceType() === "media" || request.resourceType() === "stylesheet") {
+  // Fix filtering stylesheets was causing login to break, thus, it was removed
+  if(request.resourceType() === 'image' || request.resourceType() === "media") {
     request.abort()
   }else{
     request.continue()
@@ -417,21 +434,25 @@ async function instaLogin(userId, endpoint) {
     const inputPassword = await page.$x(query)
     await inputPassword[0].type(password, {delay: 25})
 
+    await sleepMedium()
+
+    // Hover to the bottom
+    query = "//span[text()='Sign up']"
+    const signUpButton = await page.$x(query)
+    await signUpButton[0].hover()
+
     // Submit log in details
     query = "//button/div[text()='Log In']"
+    await page.waitForXPath(query)
     const submitButton = await page.$x(query)
-
-    // console.log(submitButton)
-
-    let nav = page.waitForNavigation()
     try {
-      await submitButton[0].click()
+      await Promise.all([page.waitForNavigation(), submitButton[0].click({delay: 255})])
     }catch (e) {
-      console.log("Timeout: click submit, time: "+new Date())
+      console.log("Timeout: click submit, time: " + new Date())
       return false
     }
 
-    await nav
+    await sleepLong()
 
     const cookies = await page.cookies()
 
@@ -452,7 +473,7 @@ async function instaLogin(userId, endpoint) {
       query = "//button[text()='Submit']"
       const securityCodeSubmit = await page.$x(query)
       try {
-        await securityCodeSubmit[0].click()
+        await securityCodeSubmit[0].click({delay: 255})
       }catch (e) {
         console.log("Timeout: click security submit, time: "+new Date())
         return false
@@ -469,7 +490,7 @@ async function instaLogin(userId, endpoint) {
     Meteor.call('logSaveUser', {message: 'Suspicious login detected. Asked to prove this was me.', author: userId})
     await sleepMedium()
     try {
-      await thisWasMeButton[0].click()
+      await thisWasMeButton[0].click({delay: 255})
     }catch (e) {
       console.log("Timeout: click this was me, time: "+new Date())
       return false
@@ -485,7 +506,7 @@ async function instaLogin(userId, endpoint) {
     await sleepMedium()
 
     try {
-      await sendSecurityCodeButton[0].click()
+      await sendSecurityCodeButton[0].click({delay: 255})
     }catch (e) {
       console.log("Timeout: click send security code, time: "+new Date())
       return false
@@ -508,19 +529,20 @@ async function instaCheckLoginStatus(userId, endpoint) {
   const page = await pages[0]
 
   // Go to the user's page
-  let url = "https://www.instagram.com/accounts/login/"
+  let url = "https://www.instagram.com/accounts/login"
   try{
-    await page.goto(url)
+    await Promise.all([page.waitForNavigation(), page.goto(url, {waitUntil: 'networkidle0'})])
   }catch(e){
-    console.log("Timeout: "+url+" time: "+new Date())
+    console.log("Timeout: " + url + " time: " + new Date())
     return false
   }
 
   await sleepLong()
 
-  // Check if login button is present
+  // Check if username input field is present
   let query = "//input[@name='username']"
   const usernameInput = await page.$x(query)
+  // console.log('username input: ' + usernameInput.length)
 
   await sleepLong()
 
@@ -550,7 +572,7 @@ async function instaPickFromTag(userId, endpoint, tag) {
   // Go to the tag
   let url = "https://instagram.com/explore/tags/" + tag + "/"
   try{
-    await page.goto(url)
+    await Promise.all([page.waitForNavigation(), page.goto(url, {waitUntil: 'networkidle0'})])
   }catch (e) {
     console.log("Timeout: "+url+" time: "+new Date())
     return false
@@ -588,14 +610,12 @@ async function instaPickFromTag(userId, endpoint, tag) {
 
   // Click a random image
   const imageNumber = getRandomIntInclusive(9, images.length-1)
-  const navigationPromise = page.waitForNavigation()
   try {
-    await images[imageNumber].click()
+    await Promise.all([page.waitForNavigation(), images[imageNumber].click({delay: 255})])
   }catch (e) {
     console.log("Timeout: click image, time: "+new Date())
     return false
   }
-  await navigationPromise
 
   await sleepLong()
 
@@ -622,7 +642,7 @@ async function instaGetUserStats(userId, endpoint, userName) {
   let url = "https://instagram.com/" + userName + "/"
   Meteor.call('logSaveUser', {message: 'Loading page: ' + url, author: userId})
   try{
-    await page.goto(url)
+    await Promise.all([page.waitForNavigation(), page.goto(url, {waitUntil: 'networkidle0'})])
   }catch(e){
     console.log("Timeout: " + url + " time: "+new Date())
     return false
@@ -646,18 +666,44 @@ async function instaGetUserStats(userId, endpoint, userName) {
   stats.username = userName
 
   // Get avatar
-  let avatar = ''
-  query = "//img[contains(@alt, 'Change Profile Photo')]"
-  let img = await page.$x(query)
-  let photo = ''
-  if(img.length > 0) {
-    photo = await img[0].getProperty('src')
-    stats.avatar = photo._remoteObject.value
-  } else {
-    stats.avatar = photo
+  query = "//meta[contains(@property, 'og:image')]"
+  let avatarHandle = await page.$x(query)
+  if(avatarHandle.length > 0) {
+    let avatar = await avatarHandle[0].getProperty('content')
+    stats.avatar = avatar._remoteObject.value
+  }else{
+    return false
   }
+  
+  // Get avatar
+  // let avatar = ''
+  // query = "//img[contains(@alt, 'Change Profile Photo')]"
+  // let img = await page.$x(query)
+  // let photo = ''
+  // if(img.length > 0) {
+  //   photo = await img[0].getProperty('src')
+  //   stats.avatar = photo._remoteObject.value
+  // } else {
+  //   stats.avatar = photo
+  // }
 
-  await page.goBack()
+  await Promise.all([page.waitForNavigation(), page.goBack()])
+
+  // Get user id only for other users and ignore this for yourself
+  const user = Meteor.users.findOne(userId, {fields: {instaCredentials: 1}})
+  if (user.instaCredentials.username !== userName) {
+    // Get user id
+    query = "//meta[contains(@property, 'instapp:owner_user_id')]"
+    let userIdHandle = await page.$x(query)
+    if(userIdHandle.length > 0) {
+      let instaUserId = await userIdHandle[0].getProperty('content')
+      stats.userId = instaUserId._remoteObject.value
+    }else{
+      return false
+    }
+  }else{
+    stats.userId = ''
+  }
 
   return stats
 }
@@ -679,7 +725,7 @@ async function instaGetNewUsername(userId, endpoint, username) {
   let url = like.url
 
   try{
-    await page.goto(url)
+    await Promise.all([page.waitForNavigation(), page.goto(url, {waitUntil: 'networkidle0'})])
   }catch(e){
     console.log("Timeout: "+url+" time: "+new Date())
     return false
@@ -704,7 +750,7 @@ async function instaGetNewUsername(userId, endpoint, username) {
   return userName._remoteObject.value
 }
 
-async function instaLike(userId, endpoint, userName, userUrl, tag) {
+async function instaLike(userId, endpoint, instaUserId, instaUserName, instaUserUrl, tag) {
   // Only interact once
   // Disable this - likes can be attributed to the same people now
   // const likes = await Likes.find({author: userId, userName: userName}).fetch()
@@ -754,17 +800,6 @@ async function instaLike(userId, endpoint, userName, userUrl, tag) {
     }
   }
 
-  // Get user id
-  query = "//meta[contains(@property, 'instapp:owner_user_id')]"
-  let postUserIdHandle = await page.$x(query)
-  let postUserId = ''
-  if(postUserIdHandle.length > 0) {
-    postUserId = await postUserIdHandle[0].getProperty('content')
-    likeData.userId = postUserId._remoteObject.value
-  }else{
-    return false
-  }
-
   // Click for a like
   // Get like button
   // 03/07/2018 fix applied
@@ -776,8 +811,6 @@ async function instaLike(userId, endpoint, userName, userUrl, tag) {
   }
 
   await sleepLong()
-
-  // await page.screenshot({path: '/home/screenshot.png', fullPage: true})
 
   await likeButton[0].click({delay: 255})
 
@@ -799,8 +832,9 @@ async function instaLike(userId, endpoint, userName, userUrl, tag) {
   // }
 
   likeData.author = userId
-  likeData.userName = userName
-  likeData.userUrl = userUrl
+  likeData.userId = instaUserId
+  likeData.userName = instaUserName
+  likeData.userUrl = instaUserUrl
   likeData.tag = tag
 
   Meteor.call('likeSave', likeData)
@@ -810,23 +844,11 @@ async function instaLike(userId, endpoint, userName, userUrl, tag) {
   return true
 }
 
-async function instaFollow(userId, endpoint, userName, userUrl, tag) {
+async function instaFollow(userId, endpoint, instaUserId, instaUserName, instaUserUrl, tag) {
   //Only follow once
-  const follows = Follows.find({author: userId, userName: userName}).fetch()
+  const follows = Follows.find({author: userId, userName: instaUserName}).fetch()
   if(follows.length > 0) {
     return false
-  }
-
-  // Check whether we are over follow rate threshold
-  const user = Meteor.users.findOne(userId, {fields: {settings: 1}})
-  const follow = Follows.findOne({author: userId, following: true}, {sort: {createdAt: -1}})
-  if(follow) {
-    const currentTime = new Date()
-    const elapsedTime = currentTime - follow.createdAt
-    // Less than a followRate since the last follow
-    if(elapsedTime < user.settings.followRate * 1000) {
-      return false
-    }
   }
 
   Meteor.call('logSaveUser', {message: '--- Running insta follow', author: userId})
@@ -853,12 +875,13 @@ async function instaFollow(userId, endpoint, userName, userUrl, tag) {
 
   // Click follow
   try{
-    await followButton[0].click()
+    await followButton[0].click({delay: 255})
   }catch (e) {
     console.log(e)
     return false
   }
-  Meteor.call('follow.save', {author: userId, userName: userName, userUrl: userUrl, tag: tag})
+
+  Meteor.call('follow.save', {author: userId, userId: instaUserId, userName: instaUserName, userUrl: instaUserUrl, tag: tag})
 
   return true
 }
@@ -898,11 +921,13 @@ async function instaUnfollow(userId, endpoint) {
   const page = pages[0]
 
   // Go to user
+  // TODO - navigate to the user using user id rather than url
   Meteor.call('logSaveUser', {message: 'Loading page: ' + follow.userUrl, author: userId})
   try{
-    await page.goto(follow.userUrl)
+    await Promise.all([page.waitForNavigation(), page.goto(follow.userUrl)])
+    // await page.goto(follow.userUrl)
   }catch (e) {
-    console.log("Timeout: "+follow.userUrl+" time: "+new Date())
+    console.log("Timeout: " + follow.userUrl + " time: " + new Date())
     return false
   }
 
@@ -926,22 +951,27 @@ async function instaUnfollow(userId, endpoint) {
     // Go to the user's page
     let url = "https://instagram.com/" + username + "/"
     try{
-      await page.goto(url)
+      await Promise.all([page.waitForNavigation(), page.goto(url)])
+      // await page.goto(url)
     }catch(e){
-      console.log("Timeout: "+url+" time: "+new Date())
+      console.log("Timeout: " + url + " time: " + new Date())
       return false
     }
     Meteor.call('logSaveUser', {message: 'Loading page: ' + url, author: userId})
   }
 
   // Check whether is already followed
-  query = "//button[text()='Following']"
+  query = "//span[contains(@class, 'glyphsSpriteFriend_Follow u-__7')]"
+  const followingIndicator = await page.$x(query)
+
+  // Get Following button handle
+  query = "//button[contains(@class, '_6VtSN')]"
   const followingButton = await page.$x(query)
 
   // Click unfollow if still following
-  if(followingButton.length > 0) {
+  if(followingIndicator.length > 0 && followingButton.length > 0) {
     try{
-      await followingButton[0].click()
+      await followingButton[0].click({delay: 255})
     }catch (e) {
       console.log(e)
       return false
@@ -956,13 +986,14 @@ async function instaUnfollow(userId, endpoint) {
     return false
   }
 
+  await sleepMedium()
+
   // 03/07/2018 Unfollow dialog fix
   query = "//button[text()='Unfollow']"
   const unfollowButton = await page.$x(query)
-
   if(unfollowButton.length > 0) {
     try{
-      await unfollowButton[0].click()
+      await unfollowButton[0].click({delay: 255})
     }catch (e) {
       console.log(e)
       return false
@@ -975,7 +1006,7 @@ async function instaUnfollow(userId, endpoint) {
   try{
     await page.goto(follow.userUrl)
   }catch (e) {
-    console.log("Timeout: "+follow.userUrl+" time: "+new Date())
+    console.log("Timeout: " + follow.userUrl+" time: " + new Date())
     return false
   }
 
@@ -992,22 +1023,11 @@ async function instaUnfollow(userId, endpoint) {
   return true
 }
 
-async function instaComment(userId, endpoint, userName, userUrl, tag) {
+async function instaComment(userId, endpoint, instaUserId, instaUserName, instaUserUrl, tag) {
   //Only comment once
-  const comments = Comments.find({author: userId, userName: userName}).fetch()
+  const comments = Comments.find({author: userId, userName: instaUserName}).fetch()
   if(comments.length > 0) {
     return false
-  }
-
-  // Check whether we are over comment rate threshold
-  const user = Meteor.users.findOne(userId, {fields: {settings: 1}})
-  const comment = Comments.findOne({author: userId}, {sort: {createdAt: -1}})
-  if(comment) {
-    const currentTime = new Date()
-    const elapsedTime = currentTime - comment.createdAt
-    if(elapsedTime < user.settings.commentRate * 1000) {
-      return false
-    }
   }
 
   Meteor.call('logSaveUser', {message: '--- Running insta comment', author: userId})
@@ -1039,7 +1059,7 @@ async function instaComment(userId, endpoint, userName, userUrl, tag) {
   await commentTextarea[0].type(generatedComment, {delay: 25})
   await sleepShort()
   await commentTextarea[0].press('Enter')
-  Meteor.call('comment.save', {message: generatedComment, url: url, author: userId, userName: userName, userUrl: userUrl, tag: tag})
+  Meteor.call('comment.save', {message: generatedComment, url: url, author: userId, userId: instaUserId, userName: instaUserName, userUrl: instaUserUrl, tag: tag})
 
   return true
 }

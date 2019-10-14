@@ -1,6 +1,9 @@
 <template>
   <div>
     <div v-if="$subReady.statsLatest && statsLatest" class="stats stats-my">
+      <div class="stat avatar">
+        <a v-bind:href="statsLatest.avatar" target="_blank"><img v-bind:src="statsLatest.avatar"></a>
+      </div>
       <div class="stat">
         Updated {{statsLatest.createdAt | fromNow}}
         <div class="number">
@@ -485,23 +488,33 @@
 
   .stats-my {border-bottom: 1px solid gainsboro;}
   .stats-my .stat {display: inline-block; margin-right: 25px; margin-bottom: 20px;}
+  .stats-my .avatar {margin-right: 10px;}
+  .stats-my .avatar img {width: 40px; height: 40px;}
   .stats-my .controls {margin-bottom: 5px;}
+
   .change-info {position: absolute; z-index: 1; margin-top: 10px; padding: 10px; font-size: 0.85rem; color: black; border: 1px solid gainsboro; background: white;}
   .change-info .change-info-stats th {text-align: left;}
   .change-info .change-info-stats td {padding-right: 25px;}
   .change-info .change-info-stats .change-info-stat {display: inline-block; min-width: 35px;}
+
   .dashboard {width: 100%; min-height: 85px; padding: 5px; border: 1px solid gainsboro;}
   .dashboard td {width: 50%; vertical-align: top;}
   .dashboard .browser .code {margin-top: 10px;}
   .dashboard .controls button {margin-bottom: 5px;}
+
   .activity {width: 100%; margin: 10px 0; font-size: 1rem;}
   .activity td {width: 33%; vertical-align: top; padding-right: 10px; font-size: 0.85rem;}
   .activity .title {margin-bottom: 5px; font-size: 1rem; font-weight: bold;}
+
   .likes .like {margin-bottom: 3px; color: dimgrey;}
   .likes .like img {width: 22px; height: 22px; vertical-align: middle;}
+
   .follows {margin-bottom: 10px;}
   .follows .follow {margin-bottom: 3px; color: dimgrey;}
+
   .unfollows .unfollow {margin-bottom: 3px; color: dimgrey;}
+
   .comments .comment {margin-bottom: 3px; color: dimgrey;}
+  
   .logs {max-height: 300px; height: 300px; margin: 10px 0; padding: 5px; font-size: 0.85rem; overflow-y: scroll; border: 1px solid gainsboro;}
 </style>
