@@ -1049,6 +1049,7 @@ async function instaComment(userId, endpoint, instaUserId, instaUserName, instaU
 
   // Generate a comment
   let generatedComment = ''
+  const user = Meteor.users.findOne(userId, {fields: {settings: 1}})
   const commentSeed = user.settings.commentSeed.split('|')
   commentSeed.forEach(function(part) {
     let partArray = part.split(',')
